@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>College Exam Time Planner</title>
+    <meta
+      name="description"
+      content="Plan two long exams across the college day, account for extra time, and print a simple timetable."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Exam Scheduling</p>
+          <h1>College exam time planner</h1>
+          <p class="hero-text">
+            Build a simple printable list for long exams, split around the college day, and account for extra time
+            without working it out by hand.
+          </p>
+          <div class="hero-notes">
+            <span class="chip">College day: 09:00 to 16:30</span>
+            <span class="chip">Breaks built in automatically</span>
+            <span class="chip">Print-friendly output</span>
+          </div>
+        </div>
+
+        <aside class="hero-card">
+          <h2>Built-in day structure</h2>
+          <ul class="slot-list">
+            <li>09:00 to 11:10</li>
+            <li>11:25 to 13:35</li>
+            <li>14:20 to 15:20</li>
+            <li>15:25 to 16:30</li>
+          </ul>
+          <p class="small-copy">Usable exam time each day: 6 hours 25 minutes.</p>
+        </aside>
+      </header>
+
+      <main class="layout">
+        <section class="panel form-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Inputs</p>
+              <h2>Planner details</h2>
+            </div>
+          </div>
+
+          <form id="planner-form" class="planner-form">
+            <label>
+              Student or group name
+              <input id="student-name" name="studentName" placeholder="Example: Jamie Smith" />
+            </label>
+
+            <div class="field-grid">
+              <label>
+                Exam 1 name
+                <input id="exam-one-name" name="examOneName" value="Exam 1" />
+              </label>
+
+              <label>
+                Exam 1 hours
+                <input id="exam-one-hours" name="examOneHours" type="number" min="0.5" step="0.25" value="25" />
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label>
+                Exam 2 name
+                <input id="exam-two-name" name="examTwoName" value="Exam 2" />
+              </label>
+
+              <label>
+                Exam 2 hours
+                <input id="exam-two-hours" name="examTwoHours" type="number" min="0.5" step="0.25" value="32" />
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label>
+                Extra time percentage
+                <input id="extra-time" name="extraTime" type="number" min="0" step="5" value="0" />
+              </label>
+
+              <label>
+                Schedule order
+                <select id="schedule-order" name="scheduleOrder">
+                  <option value="listed">Exam 1 then Exam 2</option>
+                  <option value="largest-first">Longest exam first</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label>
+                Start date
+                <input id="start-date" name="startDate" type="date" required />
+              </label>
+
+              <label>
+                End date
+                <input id="end-date" name="endDate" type="date" required />
+              </label>
+            </div>
+
+            <fieldset class="weekday-fieldset">
+              <legend>Available days</legend>
+              <div class="weekday-grid">
+                <label><input type="checkbox" name="weekday" value="1" checked /> Mon</label>
+                <label><input type="checkbox" name="weekday" value="2" checked /> Tue</label>
+                <label><input type="checkbox" name="weekday" value="3" checked /> Wed</label>
+                <label><input type="checkbox" name="weekday" value="4" checked /> Thu</label>
+                <label><input type="checkbox" name="weekday" value="5" checked /> Fri</label>
+              </div>
+            </fieldset>
+
+            <div class="button-row">
+              <button class="primary-button" type="submit">Build printable plan</button>
+              <button class="ghost-button" id="print-button" type="button">Print</button>
+            </div>
+
+            <p class="helper-text" id="form-feedback">
+              Enter the dates and durations, then the planner will split each exam into day-by-day sittings.
+            </p>
+          </form>
+        </section>
+
+        <section class="panel output-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Output</p>
+              <h2>Printable timetable</h2>
+            </div>
+          </div>
+
+          <div class="summary-grid" id="summary-grid"></div>
+          <div class="warning-banner is-hidden" id="warning-banner"></div>
+          <div class="schedule-list" id="schedule-list"></div>
+
+          <div class="empty-state" id="empty-state">
+            <h3>Your plan will appear here</h3>
+            <p>Use the default 25 and 32 hour exams or change them to match the real papers.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="summary-card-template">
+      <article class="summary-card">
+        <p class="summary-label"></p>
+        <strong class="summary-value"></strong>
+      </article>
+    </template>
+
+    <template id="day-card-template">
+      <article class="day-card">
+        <div class="day-card-header">
+          <div>
+            <p class="day-date"></p>
+            <h3 class="day-title"></h3>
+          </div>
+          <p class="day-total"></p>
+        </div>
+        <table class="session-table">
+          <thead>
+            <tr>
+              <th>Exam</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Length</th>
+            </tr>
+          </thead>
+          <tbody class="session-body"></tbody>
+        </table>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
