@@ -75,6 +75,7 @@ function bindEvents() {
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
   els.weekStart.addEventListener("change", refreshCalendar);
+  window.addEventListener("resize", syncTimeColumnOffset);
 }
 
 function renderTimeColumn() {
@@ -341,6 +342,7 @@ function renderCalendar(config, message) {
   renderSummary(config);
   renderWeek(config);
   renderWarning(config);
+  syncTimeColumnOffset();
   els.formFeedback.textContent = message;
   els.formFeedback.classList.remove("is-error");
 }
@@ -600,6 +602,21 @@ function renderSummaryChip(text) {
   chip.className = "summary-chip";
   chip.textContent = text;
   return chip;
+}
+
+function syncTimeColumnOffset() {
+  const firstTrack = els.calendarGrid.querySelector(".calendar-track");
+  if (!firstTrack) {
+    return;
+  }
+
+  const calendarShell = els.calendarGrid.parentElement;
+  if (!calendarShell) {
+    return;
+  }
+
+  const offset = firstTrack.getBoundingClientRect().top - calendarShell.getBoundingClientRect().top;
+  els.timeColumn.style.marginTop = `${Math.max(0, Math.round(offset))}px`;
 }
 
 function getExamTaskNames(examType) {

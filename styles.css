@@ -270,7 +270,6 @@ select:focus {
 
 .time-column {
   position: relative;
-  margin-top: 172px;
   height: 720px;
   border-radius: 22px;
 }
@@ -385,7 +384,7 @@ select:focus {
   padding: 8px;
   text-align: center;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(219, 234, 254, 0.88), rgba(224, 242, 254, 0.92));
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.72), rgba(224, 242, 254, 0.78));
   border: 1px solid rgba(37, 99, 235, 0.16);
   z-index: 1;
 }
@@ -435,25 +434,27 @@ select:focus {
   position: absolute;
   left: 14px;
   right: 14px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-left: 5px solid var(--accent);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(239, 246, 255, 0.985));
+  background: rgba(255, 255, 255, 0.995);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.10);
   overflow: hidden;
   z-index: 3;
 }
 
 .session-block h3 {
-  font-size: 0.98rem;
-  line-height: 1.2;
+  font-size: 0.8rem;
+  line-height: 1.15;
   color: var(--ink);
+  margin: 4px 0 3px;
 }
 
 .session-time,
 .session-length {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.68rem;
   color: #475569;
+  line-height: 1.1;
 }
 
 .session-time {
