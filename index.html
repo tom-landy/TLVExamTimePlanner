@@ -6,7 +6,7 @@
     <title>Weekly Exam Task Calendar</title>
     <meta
       name="description"
-      content="Enter student on-site hours, add up to six tasks, and place them into a one-week calendar."
+      content="Choose one exam, set the candidate's week, and place tasks into a one-week calendar."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,13 +23,13 @@
           <p class="eyebrow">One Week View</p>
           <h1>Weekly exam task calendar</h1>
           <p class="hero-text">
-            Choose one exam, enter when the student is on site, then place that exam's tasks into the normal
-            timetable and see how they flow across the week.
+            Choose one exam, set which days the candidate is in, then place that exam's tasks into the week's
+            timetable.
           </p>
         </div>
         <div class="hero-note">
           <strong>How it works</strong>
-          <p>Select a task on the left, then place it into the available timetable on the right.</p>
+          <p>Pick `ESP` or `OSP`, then use the calendar itself to mark whether the candidate is in and what times apply.</p>
         </div>
       </header>
 
@@ -37,7 +37,7 @@
         <section class="panel control-panel">
           <div class="section-heading">
             <p class="eyebrow">Setup</p>
-            <h2>Student hours and tasks</h2>
+            <h2>Student and exam</h2>
           </div>
 
           <form id="planner-form" class="planner-form">
@@ -59,15 +59,10 @@
               </select>
             </label>
 
-            <div class="section-heading compact">
-              <p class="eyebrow">On-site timetable</p>
-            </div>
-
             <p class="break-note">
-              Built-in breaks are always removed: 11:10 to 11:25, 13:35 to 14:20, and 15:20 to 15:25.
+              Use the calendar tick box to show whether the candidate is in that day. Fixed breaks are always removed:
+              11:10 to 11:25, 13:35 to 14:20, and 15:20 to 15:25.
             </p>
-
-            <div class="day-inputs" id="day-inputs"></div>
 
             <div class="section-heading compact">
               <p class="eyebrow">Tasks</p>
@@ -85,8 +80,8 @@
             </div>
 
             <p class="helper-text" id="form-feedback">
-              The calendar only uses the hours you mark as on site, minus the fixed breaks. Tasks split automatically
-              if they run out of room in a day.
+              Time edits update the calendar after a valid time is entered. Tasks still split automatically around the
+              fixed breaks.
             </p>
           </form>
         </section>
@@ -100,35 +95,13 @@
           <div class="summary-strip" id="summary-strip"></div>
           <div class="warning-banner is-hidden" id="warning-banner"></div>
 
-          <div class="calendar-shell" id="calendar-shell">
+          <div class="calendar-shell">
             <div class="time-column" id="time-column"></div>
             <div class="calendar-grid" id="calendar-grid"></div>
           </div>
         </section>
       </main>
     </div>
-
-    <template id="day-input-template">
-      <div class="day-input-card">
-        <div class="day-input-header">
-          <label class="checkbox-line">
-            <input class="day-enabled" type="checkbox" checked />
-            <span class="day-name"></span>
-          </label>
-          <span class="day-date"></span>
-        </div>
-        <div class="time-row">
-          <label>
-            Start
-            <input class="day-start" type="time" value="09:00" />
-          </label>
-          <label>
-            End
-            <input class="day-end" type="time" value="16:30" />
-          </label>
-        </div>
-      </div>
-    </template>
 
     <template id="task-row-template">
       <label class="task-row">
@@ -148,6 +121,10 @@
             <span class="calendar-day-name"></span>
             <span class="calendar-day-date"></span>
           </div>
+          <label class="calendar-day-toggle">
+            <input class="calendar-day-enabled" type="checkbox" />
+            <span>In</span>
+          </label>
           <button class="day-place-button" type="button">Place task</button>
         </div>
         <div class="calendar-time-edit">

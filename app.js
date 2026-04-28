@@ -13,9 +13,14 @@ const EXAM_TASKS = {
   ESP: ["Task 1.1", "Task 1.2", "Task 1.3", "Task 1.4", "Task 2.1", "Task 2.2"],
   OSP: ["Task 1", "Task 2", "Task 3", "Task 4", "Task 5", "Task 6"],
 };
+const EXAM_DEFAULT_HOURS = {
+  ESP: [8, 3.5, 4, 3.5, 2.5, 3.5],
+  OSP: [8, 6, 6, 3, 3, 6],
+};
 
 const state = {
   placements: [],
+  daySettings: [],
 };
 
 const els = {
@@ -23,7 +28,6 @@ const els = {
   studentName: document.querySelector("#student-name"),
   weekStart: document.querySelector("#week-start"),
   examType: document.querySelector("#exam-type"),
-  dayInputs: document.querySelector("#day-inputs"),
   taskList: document.querySelector("#task-list"),
   placeTaskButton: document.querySelector("#place-task-button"),
   autoPlaceButton: document.querySelector("#auto-place-button"),
@@ -34,7 +38,6 @@ const els = {
   warningBanner: document.querySelector("#warning-banner"),
   timeColumn: document.querySelector("#time-column"),
   calendarGrid: document.querySelector("#calendar-grid"),
-  dayInputTemplate: document.querySelector("#day-input-template"),
   taskRowTemplate: document.querySelector("#task-row-template"),
   dayColumnTemplate: document.querySelector("#day-column-template"),
 };
@@ -43,25 +46,30 @@ initialise();
 
 function initialise() {
   els.weekStart.value = getCurrentMonday();
+  initialiseDaySettings();
   renderTimeColumn();
-  renderDayInputs();
   renderTaskRows();
   bindEvents();
   refreshCalendar();
 }
 
+function initialiseDaySettings() {
+  state.daySettings = DAYS.map(() => ({
+    enabled: true,
+    start: "09:00",
+    end: "16:30",
+  }));
+}
+
 function bindEvents() {
   els.form.addEventListener("submit", handleRefresh);
+  els.form.addEventListener("change", handleLiveUpdate);
   els.placeTaskButton.addEventListener("click", handlePlaceSelectedTask);
   els.autoPlaceButton.addEventListener("click", handleAutoPlaceAll);
   els.clearButton.addEventListener("click", handleClearCalendar);
   els.printButton.addEventListener("click", handlePrint);
-  els.form.addEventListener("change", handleLiveUpdate);
   els.examType.addEventListener("change", handleExamTypeChange);
-  els.weekStart.addEventListener("change", () => {
-    renderDayDates();
-    refreshCalendar();
-  });
+  els.weekStart.addEventListener("change", refreshCalendar);
 }
 
 function renderTimeColumn() {
@@ -71,38 +79,22 @@ function renderTimeColumn() {
     const label = document.createElement("div");
     label.className = "time-label";
     label.textContent = fromMinutes(minutes);
+    label.style.top = `${minuteToPercent(minutes)}%`;
     labels.push(label);
   }
 
   els.timeColumn.replaceChildren(...labels);
 }
 
-function renderDayInputs() {
-  const nodes = DAYS.map((day) => {
-    const node = els.dayInputTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".day-name").textContent = day;
-    return node;
-  });
-
-  els.dayInputs.replaceChildren(...nodes);
-  renderDayDates();
-}
-
-function renderDayDates() {
-  Array.from(els.dayInputs.children).forEach((node, index) => {
-    node.querySelector(".day-date").textContent = formatDate(addDays(els.weekStart.value || getCurrentMonday(), index));
-  });
-}
-
 function renderTaskRows() {
-  const defaultDurations = [2, 2, 1.5, 1, 1, 1];
   const taskNames = getExamTaskNames(els.examType.value);
+  const defaultDurations = getExamDefaultHours(els.examType.value);
 
   const nodes = Array.from({ length: TASK_COUNT }, (_, index) => {
     const node = els.taskRowTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector(".task-number").textContent = `Task ${index + 1}`;
     node.querySelector(".task-name").value = taskNames[index];
-    node.querySelector(".task-hours").value = defaultDurations[index];
+    node.querySelector(".task-hours").value = String(defaultDurations[index]);
     node.querySelector(".task-select").value = String(index);
 
     if (index === 0) {
@@ -137,12 +129,12 @@ function handleLiveUpdate(event) {
 }
 
 function handleExamTypeChange() {
-  const durations = Array.from(els.taskList.children).map((node) => node.querySelector(".task-hours").value || "1");
   const taskNames = getExamTaskNames(els.examType.value);
+  const durations = getExamDefaultHours(els.examType.value);
 
   Array.from(els.taskList.children).forEach((node, index) => {
     node.querySelector(".task-name").value = taskNames[index];
-    node.querySelector(".task-hours").value = durations[index] || "1";
+    node.querySelector(".task-hours").value = String(durations[index]);
   });
 
   state.placements = [];
@@ -222,7 +214,6 @@ function refreshCalendar() {
   state.placements = state.placements.filter((placement) => {
     const task = config.tasks[placement.taskIndex];
     const day = config.days[placement.dayIndex];
-
     return task && task.name && task.minutes > 0 && isPlacementValid(day, placement);
   });
 
@@ -234,25 +225,20 @@ function readForm() {
     return invalid("Choose the Monday for this week.");
   }
 
-  const days = Array.from(els.dayInputs.children).map((node, index) => {
-    const enabled = node.querySelector(".day-enabled").checked;
-    const start = node.querySelector(".day-start").value;
-    const end = node.querySelector(".day-end").value;
-    return {
-      index,
-      name: DAYS[index],
-      date: addDays(els.weekStart.value, index),
-      enabled,
-      start,
-      end,
-      startMinutes: enabled ? toMinutes(start) : 0,
-      endMinutes: enabled ? toMinutes(end) : 0,
-    };
-  });
+  const days = state.daySettings.map((daySetting, index) => ({
+    index,
+    name: DAYS[index],
+    date: addDays(els.weekStart.value, index),
+    enabled: daySetting.enabled,
+    start: daySetting.start,
+    end: daySetting.end,
+    startMinutes: daySetting.enabled ? toMinutes(daySetting.start) : 0,
+    endMinutes: daySetting.enabled ? toMinutes(daySetting.end) : 0,
+  }));
 
   for (const day of days) {
     if (day.enabled && (!day.start || !day.end || day.endMinutes <= day.startMinutes)) {
-      return invalid(`Check the on-site hours for ${day.name}.`);
+      return invalid(`Check the hours for ${day.name}.`);
     }
   }
 
@@ -309,16 +295,10 @@ function placeTask(config, taskIndex, startDayIndex) {
   }
 
   if (remainingMinutes > 0) {
-    return {
-      remainingMinutes,
-      message: `${task.name} did not fully fit into this week.`,
-    };
+    return { remainingMinutes, message: `${task.name} did not fully fit into this week.` };
   }
 
-  return {
-    remainingMinutes: 0,
-    message: `${task.name} placed into the calendar.`,
-  };
+  return { remainingMinutes: 0, message: `${task.name} placed into the calendar.` };
 }
 
 function getFreeSegments(day, dayIndex) {
@@ -371,9 +351,9 @@ function renderSummary(config) {
   const chips = [
     config.studentName,
     `Exam: ${config.examType}`,
-    `Available this week: ${formatMinutes(totalCapacity)}`,
-    `Task time entered: ${formatMinutes(totalTaskMinutes)}`,
-    `Task time placed: ${formatMinutes(placedMinutes)}`,
+    `Available: ${formatMinutes(totalCapacity)}`,
+    `Tasks entered: ${formatMinutes(totalTaskMinutes)}`,
+    `Placed: ${formatMinutes(placedMinutes)}`,
   ].map(renderSummaryChip);
 
   els.summaryStrip.replaceChildren(...chips);
@@ -385,12 +365,16 @@ function renderWeek(config) {
     node.querySelector(".calendar-day-name").textContent = day.name;
     node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
     node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(dayIndex));
+
+    const enabledInput = node.querySelector(".calendar-day-enabled");
     const startInput = node.querySelector(".calendar-day-start");
     const endInput = node.querySelector(".calendar-day-end");
+    enabledInput.checked = day.enabled;
     startInput.value = day.start || "09:00";
     endInput.value = day.end || "16:30";
     startInput.disabled = !day.enabled;
     endInput.disabled = !day.enabled;
+    enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(dayIndex, enabledInput.checked));
     startInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "start", startInput.value));
     endInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "end", endInput.value));
 
@@ -431,7 +415,7 @@ function renderWeek(config) {
     } else {
       const offsite = document.createElement("div");
       offsite.className = "offsite-note";
-      offsite.textContent = "Off site";
+      offsite.textContent = "Not in";
       availabilityLayer.append(offsite);
     }
 
@@ -512,16 +496,6 @@ function getBreakSegments(day) {
   })).filter((segment) => segment.end > segment.start);
 }
 
-function isPlacementValid(day, placement) {
-  if (!day || !day.enabled) {
-    return false;
-  }
-
-  return getWorkingSegments(day).some(
-    (segment) => placement.startMinutes >= segment.start && placement.endMinutes <= segment.end,
-  );
-}
-
 function subtractSegment(segment, blocked) {
   if (blocked.end <= segment.start || blocked.start >= segment.end) {
     return [segment];
@@ -540,31 +514,47 @@ function subtractSegment(segment, blocked) {
   return nextSegments;
 }
 
+function isPlacementValid(day, placement) {
+  if (!day || !day.enabled) {
+    return false;
+  }
+
+  return getWorkingSegments(day).some(
+    (segment) => placement.startMinutes >= segment.start && placement.endMinutes <= segment.end,
+  );
+}
+
 function renderValidation(message) {
   els.formFeedback.textContent = message;
   els.formFeedback.classList.add("is-error");
 }
 
 function updateDayTimeFromCalendar(dayIndex, field, value) {
-  const dayNode = els.dayInputs.children[dayIndex];
-  if (!dayNode) {
+  const daySetting = state.daySettings[dayIndex];
+  if (!daySetting) {
     return;
   }
 
-  const enabledInput = dayNode.querySelector(".day-enabled");
-  const startInput = dayNode.querySelector(".day-start");
-  const endInput = dayNode.querySelector(".day-end");
-
-  enabledInput.checked = true;
+  daySetting.enabled = true;
 
   if (field === "start") {
-    startInput.value = value;
+    daySetting.start = value;
   }
 
   if (field === "end") {
-    endInput.value = value;
+    daySetting.end = value;
   }
 
+  refreshCalendar();
+}
+
+function updateDayEnabledFromCalendar(dayIndex, enabled) {
+  const daySetting = state.daySettings[dayIndex];
+  if (!daySetting) {
+    return;
+  }
+
+  daySetting.enabled = enabled;
   refreshCalendar();
 }
 
@@ -609,6 +599,10 @@ function renderSummaryChip(text) {
 
 function getExamTaskNames(examType) {
   return EXAM_TASKS[examType] || EXAM_TASKS.ESP;
+}
+
+function getExamDefaultHours(examType) {
+  return EXAM_DEFAULT_HOURS[examType] || EXAM_DEFAULT_HOURS.ESP;
 }
 
 function minuteToPercent(minutes) {
