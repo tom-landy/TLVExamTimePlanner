@@ -29,6 +29,14 @@
           <form id="planner-form" class="planner-form">
             <div class="setup-grid">
               <label>
+                Exam
+                <select id="exam-type">
+                  <option value="ESP">ESP</option>
+                  <option value="OSP">OSP</option>
+                </select>
+              </label>
+
+              <label>
                 Candidate timing
                 <select id="timing-type">
                   <option value="standard">Standard</option>
@@ -40,25 +48,6 @@
                 Start week
                 <input id="week-start" type="date" required />
               </label>
-
-              <label>
-                Exam
-                <select id="exam-type">
-                  <option value="ESP">ESP</option>
-                  <option value="OSP">OSP</option>
-                </select>
-              </label>
-            </div>
-
-            <p class="break-note">
-              Use the tick box on each day to show whether the candidate is in. Fixed breaks are always removed:
-              11:10 to 11:25, 13:35 to 14:15, and 15:20 to 15:25. A 10 minute buffer is also added at the start of
-              each day and after each break. Each exam also starts with one reading session before the first main task.
-            </p>
-
-            <div class="section-heading compact">
-              <p class="eyebrow">Tasks</p>
-              <p class="small-copy">Choose one task, then place it into the calendar, or auto-place across all four weeks.</p>
             </div>
 
             <div class="task-list" id="task-list"></div>
@@ -105,7 +94,6 @@
           <h2 class="week-range"></h2>
         </div>
         <div class="calendar-shell">
-          <div class="time-column"></div>
           <div class="calendar-grid"></div>
         </div>
       </section>

@@ -3,15 +3,14 @@ const WEEKS = 4;
 const TOTAL_DAYS = DAYS.length * WEEKS;
 const TASK_COUNT = 6;
 const READING_MINUTES = 30;
-const DAY_START = 8 * 60;
-const DAY_END = 18 * 60;
+const DAY_START = 9 * 60;
+const DAY_END = 16.5 * 60;
 const DAY_RANGE = DAY_END - DAY_START;
 const GRID_STEP = 30;
 const BUFFER_MINUTES = 10;
 const BREAKS = [
   { start: toMinutes("11:10"), end: toMinutes("11:25"), label: "Break" },
   { start: toMinutes("13:35"), end: toMinutes("14:15"), label: "Lunch" },
-  { start: toMinutes("15:20"), end: toMinutes("15:25"), label: "Break" },
 ];
 const EXAM_TASKS = {
   ESP: ["Task 1.1", "Task 1.2", "Task 1.3", "Task 1.4", "Task 2.1", "Task 2.2"],
@@ -80,7 +79,6 @@ function bindEvents() {
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
   els.weekStart.addEventListener("change", refreshCalendar);
-  window.addEventListener("resize", syncTimeColumnsOffsets);
 }
 
 function renderTaskRows() {
@@ -363,7 +361,6 @@ function renderCalendars(config, message) {
   renderWeeks(config);
   renderWarning(config);
   renderPrintSheet(config);
-  syncTimeColumnsOffsets();
   els.formFeedback.textContent = message;
   els.formFeedback.classList.remove("is-error");
 }
@@ -455,29 +452,12 @@ function renderWeeks(config) {
     weekNode.querySelector(".week-label").textContent = `Week ${weekIndex + 1}`;
     weekNode.querySelector(".week-range").textContent = `${formatDate(weekDays[0].date)} to ${formatDate(weekDays[weekDays.length - 1].date)}`;
 
-    const timeColumn = weekNode.querySelector(".time-column");
-    timeColumn.replaceChildren(...buildTimeLabels());
-
     const dayNodes = weekDays.map((day) => renderDay(day, config));
     weekNode.querySelector(".calendar-grid").replaceChildren(...dayNodes);
     weekNodes.push(weekNode);
   }
 
   els.weeksStack.replaceChildren(...weekNodes);
-}
-
-function buildTimeLabels() {
-  const labels = [];
-
-  for (let minutes = DAY_START; minutes <= DAY_END; minutes += GRID_STEP) {
-    const label = document.createElement("div");
-    label.className = "time-label";
-    label.textContent = fromMinutes(minutes);
-    label.style.top = `${minuteToPercent(minutes)}%`;
-    labels.push(label);
-  }
-
-  return labels;
 }
 
 function renderDay(day, config) {
@@ -831,23 +811,6 @@ function renderSummaryChip(text) {
   chip.className = "summary-chip";
   chip.textContent = text;
   return chip;
-}
-
-function syncTimeColumnsOffsets() {
-  const weekSections = els.weeksStack.querySelectorAll(".week-section");
-
-  weekSections.forEach((section) => {
-    const firstTrack = section.querySelector(".calendar-track");
-    const timeColumn = section.querySelector(".time-column");
-    const shell = section.querySelector(".calendar-shell");
-
-    if (!firstTrack || !timeColumn || !shell) {
-      return;
-    }
-
-    const offset = firstTrack.getBoundingClientRect().top - shell.getBoundingClientRect().top;
-    timeColumn.style.marginTop = `${Math.max(0, Math.round(offset))}px`;
-  });
 }
 
 function getExamTaskNames(examType) {
