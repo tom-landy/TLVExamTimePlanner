@@ -116,15 +116,17 @@
         <div class="calendar-day-header">
           <div class="calendar-day-meta">
             <span class="calendar-day-name"></span>
-            <span class="calendar-day-date"></span>
+            <div class="calendar-day-submeta">
+              <span class="calendar-day-date"></span>
+              <label class="calendar-day-toggle bank-holiday-toggle is-hidden">
+                <input class="calendar-day-bank-holiday" type="checkbox" />
+                <span>Bank holiday</span>
+              </label>
+            </div>
           </div>
           <label class="calendar-day-toggle">
             <input class="calendar-day-enabled" type="checkbox" />
             <span>In</span>
-          </label>
-          <label class="calendar-day-toggle bank-holiday-toggle is-hidden">
-            <input class="calendar-day-bank-holiday" type="checkbox" />
-            <span>Bank holiday</span>
           </label>
         </div>
         <div class="calendar-time-edit">

@@ -294,6 +294,13 @@ select:focus {
   gap: 4px;
 }
 
+.calendar-day-submeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .calendar-day-toggle {
   display: flex;
   align-items: center;
@@ -308,8 +315,10 @@ select:focus {
 }
 
 .bank-holiday-toggle {
+  padding: 5px 8px;
   background: rgba(254, 242, 242, 0.92);
   color: #991b1b;
+  font-size: 0.74rem;
 }
 
 .print-sheet {
