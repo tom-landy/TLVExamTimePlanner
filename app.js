@@ -1,4 +1,6 @@
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const WEEKS = 4;
+const TOTAL_DAYS = DAYS.length * WEEKS;
 const TASK_COUNT = 6;
 const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
@@ -40,9 +42,9 @@ const els = {
   formFeedback: document.querySelector("#form-feedback"),
   summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
-  timeColumn: document.querySelector("#time-column"),
-  calendarGrid: document.querySelector("#calendar-grid"),
+  weeksStack: document.querySelector("#weeks-stack"),
   taskRowTemplate: document.querySelector("#task-row-template"),
+  weekTemplate: document.querySelector("#week-template"),
   dayColumnTemplate: document.querySelector("#day-column-template"),
 };
 
@@ -51,14 +53,13 @@ initialise();
 function initialise() {
   els.weekStart.value = getCurrentMonday();
   initialiseDaySettings();
-  renderTimeColumn();
   renderTaskRows();
   bindEvents();
   refreshCalendar();
 }
 
 function initialiseDaySettings() {
-  state.daySettings = DAYS.map(() => ({
+  state.daySettings = Array.from({ length: TOTAL_DAYS }, () => ({
     enabled: true,
     start: "09:00",
     end: "16:30",
@@ -75,21 +76,7 @@ function bindEvents() {
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
   els.weekStart.addEventListener("change", refreshCalendar);
-  window.addEventListener("resize", syncTimeColumnOffset);
-}
-
-function renderTimeColumn() {
-  const labels = [];
-
-  for (let minutes = DAY_START; minutes <= DAY_END; minutes += GRID_STEP) {
-    const label = document.createElement("div");
-    label.className = "time-label";
-    label.textContent = fromMinutes(minutes);
-    label.style.top = `${minuteToPercent(minutes)}%`;
-    labels.push(label);
-  }
-
-  els.timeColumn.replaceChildren(...labels);
+  window.addEventListener("resize", syncTimeColumnsOffsets);
 }
 
 function renderTaskRows() {
@@ -161,7 +148,7 @@ function handlePlaceSelectedTask() {
   }
 
   const placement = placeTask(config, selectedTaskIndex, 0);
-  renderCalendar(config, placement.message);
+  renderCalendars(config, placement.message);
 }
 
 function handleAutoPlaceAll() {
@@ -172,20 +159,29 @@ function handleAutoPlaceAll() {
   }
 
   state.placements = [];
-  let message = "All tasks placed into the student timetable.";
+  let nextStartDayIndex = 0;
+  let message = "All tasks placed across the four-week timetable.";
 
-  config.tasks.forEach((task, index) => {
+  for (let taskIndex = 0; taskIndex < config.tasks.length; taskIndex += 1) {
+    const task = config.tasks[taskIndex];
     if (!task.name || task.minutes <= 0) {
-      return;
+      continue;
     }
 
-    const result = placeTask(config, index, 0);
+    const result = placeTask(config, taskIndex, nextStartDayIndex);
+    const placementDays = state.placements.filter((placement) => placement.taskIndex === taskIndex).map((placement) => placement.dayIndex);
+
+    if (placementDays.length > 0) {
+      nextStartDayIndex = Math.max(...placementDays) + 1;
+    }
+
     if (result.remainingMinutes > 0) {
-      message = `${task.name} could not fully fit into this week.`;
+      message = `${task.name} could not fully fit into the four-week timetable.`;
+      break;
     }
-  });
+  }
 
-  renderCalendar(config, message);
+  renderCalendars(config, message);
 }
 
 function handleClearCalendar() {
@@ -196,7 +192,7 @@ function handleClearCalendar() {
     return;
   }
 
-  renderCalendar(config, "Calendar cleared.");
+  renderCalendars(config, "Calendars cleared.");
 }
 
 function handlePrint() {
@@ -206,7 +202,7 @@ function handlePrint() {
     return;
   }
 
-  renderCalendar(config, "Ready to print.");
+  renderCalendars(config, "Ready to print.");
   window.print();
 }
 
@@ -223,28 +219,29 @@ function refreshCalendar() {
     return task && task.name && task.minutes > 0 && isPlacementValid(day, placement);
   });
 
-  renderCalendar(config, "Calendar refreshed.");
+  renderCalendars(config, "Calendars refreshed.");
 }
 
 function readForm() {
   if (!els.weekStart.value) {
-    return invalid("Choose the Monday for this week.");
+    return invalid("Choose the Monday for the first week.");
   }
 
   const days = state.daySettings.map((daySetting, index) => ({
     index,
-    name: DAYS[index],
-    date: addDays(els.weekStart.value, index),
+    name: DAYS[index % DAYS.length],
+    date: addPlannerDays(els.weekStart.value, index),
     enabled: daySetting.enabled,
     start: daySetting.start,
     end: daySetting.end,
     startMinutes: daySetting.enabled ? toMinutes(daySetting.start) : 0,
     endMinutes: daySetting.enabled ? toMinutes(daySetting.end) : 0,
+    weekIndex: Math.floor(index / DAYS.length),
   }));
 
   for (const day of days) {
     if (day.enabled && (!day.start || !day.end || day.endMinutes <= day.startMinutes)) {
-      return invalid(`Check the hours for ${day.name}.`);
+      return invalid(`Check the hours for ${day.name} in week ${day.weekIndex + 1}.`);
     }
   }
 
@@ -301,10 +298,10 @@ function placeTask(config, taskIndex, startDayIndex) {
   }
 
   if (remainingMinutes > 0) {
-    return { remainingMinutes, message: `${task.name} did not fully fit into this week.` };
+    return { remainingMinutes, message: `${task.name} did not fully fit into the four-week timetable.` };
   }
 
-  return { remainingMinutes: 0, message: `${task.name} placed into the calendar.` };
+  return { remainingMinutes: 0, message: `${task.name} placed into the calendars.` };
 }
 
 function getFreeSegments(day, dayIndex) {
@@ -338,11 +335,11 @@ function getFreeSegments(day, dayIndex) {
   return segments.filter((segment) => segment.end > segment.start);
 }
 
-function renderCalendar(config, message) {
+function renderCalendars(config, message) {
   renderSummary(config);
-  renderWeek(config);
+  renderWeeks(config);
   renderWarning(config);
-  syncTimeColumnOffset();
+  syncTimeColumnsOffsets();
   els.formFeedback.textContent = message;
   els.formFeedback.classList.remove("is-error");
 }
@@ -358,6 +355,7 @@ function renderSummary(config) {
   const chips = [
     `Timing: ${capitalise(config.timingType)}`,
     `Exam: ${config.examType}`,
+    `Weeks: ${WEEKS}`,
     `Available: ${formatMinutes(totalCapacity)}`,
     `Tasks entered: ${formatMinutes(totalTaskMinutes)}`,
     `Placed: ${formatMinutes(placedMinutes)}`,
@@ -366,88 +364,116 @@ function renderSummary(config) {
   els.summaryStrip.replaceChildren(...chips);
 }
 
-function renderWeek(config) {
-  const nodes = config.days.map((day, dayIndex) => {
-    const node = els.dayColumnTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".calendar-day-name").textContent = day.name;
-    node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
-    node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(dayIndex));
+function renderWeeks(config) {
+  const weekNodes = [];
 
-    const enabledInput = node.querySelector(".calendar-day-enabled");
-    const startInput = node.querySelector(".calendar-day-start");
-    const endInput = node.querySelector(".calendar-day-end");
-    enabledInput.checked = day.enabled;
-    startInput.value = day.start || "09:00";
-    endInput.value = day.end || "16:30";
-    startInput.disabled = !day.enabled;
-    endInput.disabled = !day.enabled;
-    enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(dayIndex, enabledInput.checked));
-    startInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "start", startInput.value));
-    endInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "end", endInput.value));
+  for (let weekIndex = 0; weekIndex < WEEKS; weekIndex += 1) {
+    const weekNode = els.weekTemplate.content.firstElementChild.cloneNode(true);
+    const weekDays = config.days.slice(weekIndex * DAYS.length, (weekIndex + 1) * DAYS.length);
+    weekNode.querySelector(".week-label").textContent = `Week ${weekIndex + 1}`;
+    weekNode.querySelector(".week-range").textContent = `${formatDate(weekDays[0].date)} to ${formatDate(weekDays[weekDays.length - 1].date)}`;
 
-    const grid = node.querySelector(".calendar-track-grid");
-    const availabilityLayer = node.querySelector(".availability-layer");
-    const sessionLayer = node.querySelector(".session-layer");
+    const timeColumn = weekNode.querySelector(".time-column");
+    timeColumn.replaceChildren(...buildTimeLabels());
 
-    const lines = [];
-    for (let minutes = DAY_START; minutes < DAY_END; minutes += GRID_STEP) {
-      const line = document.createElement("div");
-      line.className = "calendar-line";
-      line.style.top = `${minuteToPercent(minutes)}%`;
-      lines.push(line);
-    }
-    grid.replaceChildren(...lines);
+    const dayNodes = weekDays.map((day) => renderDay(day, config));
+    weekNode.querySelector(".calendar-grid").replaceChildren(...dayNodes);
+    weekNodes.push(weekNode);
+  }
 
-    if (day.enabled) {
-      getWorkingSegments(day).forEach((segment) => {
-        const availability = document.createElement("div");
-        availability.className = "availability-block";
-        availability.style.top = `${minuteToPercent(segment.start)}%`;
-        availability.style.height = `${durationToPercent(segment.end - segment.start)}%`;
-        availability.innerHTML = `
-          <span class="availability-time">${fromMinutes(segment.start)} to ${fromMinutes(segment.end)}</span>
-          <strong class="availability-length">${formatSegmentMinutes(segment.end - segment.start)}</strong>
-        `;
-        availabilityLayer.append(availability);
-      });
+  els.weeksStack.replaceChildren(...weekNodes);
+}
 
-      getBreakSegments(day).forEach((segment) => {
-        const breakBlock = document.createElement("div");
-        breakBlock.className = "break-block";
-        breakBlock.style.top = `${minuteToPercent(segment.start)}%`;
-        breakBlock.style.height = `${durationToPercent(segment.end - segment.start)}%`;
-        breakBlock.textContent = segment.label;
-        availabilityLayer.append(breakBlock);
-      });
-    } else {
-      const offsite = document.createElement("div");
-      offsite.className = "offsite-note";
-      offsite.textContent = "Not in";
-      availabilityLayer.append(offsite);
-    }
+function buildTimeLabels() {
+  const labels = [];
 
-    const placements = state.placements
-      .filter((placement) => placement.dayIndex === dayIndex)
-      .sort((a, b) => a.startMinutes - b.startMinutes);
+  for (let minutes = DAY_START; minutes <= DAY_END; minutes += GRID_STEP) {
+    const label = document.createElement("div");
+    label.className = "time-label";
+    label.textContent = fromMinutes(minutes);
+    label.style.top = `${minuteToPercent(minutes)}%`;
+    labels.push(label);
+  }
 
-    placements.forEach((placement) => {
-      const task = config.tasks[placement.taskIndex];
-      const session = document.createElement("article");
-      session.className = "session-block";
-      session.style.top = `${minuteToPercent(placement.startMinutes)}%`;
-      session.style.height = `${durationToPercent(placement.endMinutes - placement.startMinutes)}%`;
-      session.innerHTML = `
-        <p class="session-time">${fromMinutes(placement.startMinutes)} to ${fromMinutes(placement.endMinutes)}</p>
-        <h3>${escapeHtml(task.name)}</h3>
-        <p class="session-length">${formatMinutes(placement.endMinutes - placement.startMinutes)}</p>
+  return labels;
+}
+
+function renderDay(day, config) {
+  const node = els.dayColumnTemplate.content.firstElementChild.cloneNode(true);
+  node.querySelector(".calendar-day-name").textContent = day.name;
+  node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
+  node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(day.index));
+
+  const enabledInput = node.querySelector(".calendar-day-enabled");
+  const startInput = node.querySelector(".calendar-day-start");
+  const endInput = node.querySelector(".calendar-day-end");
+  enabledInput.checked = day.enabled;
+  startInput.value = day.start || "09:00";
+  endInput.value = day.end || "16:30";
+  startInput.disabled = !day.enabled;
+  endInput.disabled = !day.enabled;
+  enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(day.index, enabledInput.checked));
+  startInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "start", startInput.value));
+  endInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "end", endInput.value));
+
+  const grid = node.querySelector(".calendar-track-grid");
+  const availabilityLayer = node.querySelector(".availability-layer");
+  const sessionLayer = node.querySelector(".session-layer");
+
+  const lines = [];
+  for (let minutes = DAY_START; minutes < DAY_END; minutes += GRID_STEP) {
+    const line = document.createElement("div");
+    line.className = "calendar-line";
+    line.style.top = `${minuteToPercent(minutes)}%`;
+    lines.push(line);
+  }
+  grid.replaceChildren(...lines);
+
+  if (day.enabled) {
+    getWorkingSegments(day).forEach((segment) => {
+      const availability = document.createElement("div");
+      availability.className = "availability-block";
+      availability.style.top = `${minuteToPercent(segment.start)}%`;
+      availability.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+      availability.innerHTML = `
+        <span class="availability-time">${fromMinutes(segment.start)} to ${fromMinutes(segment.end)}</span>
+        <strong class="availability-length">${formatSegmentMinutes(segment.end - segment.start)}</strong>
       `;
-      sessionLayer.append(session);
+      availabilityLayer.append(availability);
     });
 
-    return node;
+    getBreakSegments(day).forEach((segment) => {
+      const breakBlock = document.createElement("div");
+      breakBlock.className = "break-block";
+      breakBlock.style.top = `${minuteToPercent(segment.start)}%`;
+      breakBlock.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+      breakBlock.textContent = segment.label;
+      availabilityLayer.append(breakBlock);
+    });
+  } else {
+    const offsite = document.createElement("div");
+    offsite.className = "offsite-note";
+    offsite.textContent = "Not in";
+    availabilityLayer.append(offsite);
+  }
+
+  const placements = state.placements.filter((placement) => placement.dayIndex === day.index).sort((a, b) => a.startMinutes - b.startMinutes);
+
+  placements.forEach((placement) => {
+    const task = config.tasks[placement.taskIndex];
+    const session = document.createElement("article");
+    session.className = "session-block";
+    session.style.top = `${minuteToPercent(placement.startMinutes)}%`;
+    session.style.height = `${durationToPercent(placement.endMinutes - placement.startMinutes)}%`;
+    session.innerHTML = `
+      <p class="session-time">${fromMinutes(placement.startMinutes)} to ${fromMinutes(placement.endMinutes)}</p>
+      <h3>${escapeHtml(task.name)}</h3>
+      <p class="session-length">${formatMinutes(placement.endMinutes - placement.startMinutes)}</p>
+    `;
+    sessionLayer.append(session);
   });
 
-  els.calendarGrid.replaceChildren(...nodes);
+  return node;
 }
 
 function renderWarning(config) {
@@ -579,7 +605,7 @@ function placeSelectedFromDay(dayIndex) {
   }
 
   const placement = placeTask(config, selectedTaskIndex, dayIndex);
-  renderCalendar(config, placement.message);
+  renderCalendars(config, placement.message);
 }
 
 function getSelectedTaskIndex() {
@@ -590,8 +616,8 @@ function getSelectedTaskIndex() {
 function buildDayOrder(startIndex, totalDays) {
   const order = [];
 
-  for (let i = 0; i < totalDays; i += 1) {
-    order.push((startIndex + i) % totalDays);
+  for (let i = startIndex; i < totalDays; i += 1) {
+    order.push(i);
   }
 
   return order;
@@ -604,19 +630,21 @@ function renderSummaryChip(text) {
   return chip;
 }
 
-function syncTimeColumnOffset() {
-  const firstTrack = els.calendarGrid.querySelector(".calendar-track");
-  if (!firstTrack) {
-    return;
-  }
+function syncTimeColumnsOffsets() {
+  const weekSections = els.weeksStack.querySelectorAll(".week-section");
 
-  const calendarShell = els.calendarGrid.parentElement;
-  if (!calendarShell) {
-    return;
-  }
+  weekSections.forEach((section) => {
+    const firstTrack = section.querySelector(".calendar-track");
+    const timeColumn = section.querySelector(".time-column");
+    const shell = section.querySelector(".calendar-shell");
 
-  const offset = firstTrack.getBoundingClientRect().top - calendarShell.getBoundingClientRect().top;
-  els.timeColumn.style.marginTop = `${Math.max(0, Math.round(offset))}px`;
+    if (!firstTrack || !timeColumn || !shell) {
+      return;
+    }
+
+    const offset = firstTrack.getBoundingClientRect().top - shell.getBoundingClientRect().top;
+    timeColumn.style.marginTop = `${Math.max(0, Math.round(offset))}px`;
+  });
 }
 
 function getExamTaskNames(examType) {
@@ -659,9 +687,11 @@ function getCurrentMonday() {
   return formatDateInput(today);
 }
 
-function addDays(dateString, days) {
+function addPlannerDays(dateString, plannerDayIndex) {
   const date = new Date(`${dateString}T12:00:00`);
-  date.setDate(date.getDate() + days);
+  const weekOffset = Math.floor(plannerDayIndex / DAYS.length) * 7;
+  const dayOffset = plannerDayIndex % DAYS.length;
+  date.setDate(date.getDate() + weekOffset + dayOffset);
   return formatDateInput(date);
 }
 

@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Weekly Exam Task Calendar</title>
+    <title>TLV Exam Calendar</title>
     <meta
       name="description"
-      content="Choose one exam, set the candidate's week, and place tasks into a one-week calendar."
+      content="Plan exam tasks across four weeks, with built-in breaks and candidate availability."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,10 +21,6 @@
       <header class="hero">
         <div>
           <h1>TLV Exam Calendar</h1>
-        </div>
-        <div class="hero-note">
-          <strong>How it works</strong>
-          <p>Pick `ESP` or `OSP`, then use the calendar itself to mark whether the candidate is in and what times apply.</p>
         </div>
       </header>
 
@@ -41,7 +37,7 @@
               </label>
 
               <label>
-                Week starting
+                Start week
                 <input id="week-start" type="date" required />
               </label>
 
@@ -55,45 +51,35 @@
             </div>
 
             <p class="break-note">
-              Use the calendar tick box to show whether the candidate is in that day. Fixed breaks are always removed:
+              Use the tick box on each day to show whether the candidate is in. Fixed breaks are always removed:
               11:10 to 11:25, 13:35 to 14:15, and 15:20 to 15:25.
             </p>
 
             <div class="section-heading compact">
               <p class="eyebrow">Tasks</p>
-              <p class="small-copy">Choose one task, then place it into the calendar.</p>
+              <p class="small-copy">Choose one task, then place it into the calendar, or auto-place across all four weeks.</p>
             </div>
 
             <div class="task-list" id="task-list"></div>
 
             <div class="button-row">
-              <button class="primary-button" type="submit">Refresh calendar</button>
+              <button class="primary-button" type="submit">Refresh calendars</button>
               <button class="ghost-button" id="place-task-button" type="button">Place selected task</button>
               <button class="ghost-button" id="auto-place-button" type="button">Auto place all</button>
-              <button class="ghost-button" id="clear-button" type="button">Clear calendar</button>
+              <button class="ghost-button" id="clear-button" type="button">Clear calendars</button>
               <button class="ghost-button" id="print-button" type="button">Print</button>
             </div>
 
             <p class="helper-text" id="form-feedback">
-              Time edits update the calendar after a valid time is entered. Tasks still split automatically around the
-              fixed breaks.
+              Auto-place uses four weeks and starts each new task on a later day than the previous task finished.
             </p>
           </form>
         </section>
 
         <section class="panel calendar-panel">
-          <div class="section-heading">
-            <p class="eyebrow">Calendar</p>
-            <h2>Student week</h2>
-          </div>
-
           <div class="summary-strip" id="summary-strip"></div>
           <div class="warning-banner is-hidden" id="warning-banner"></div>
-
-          <div class="calendar-shell">
-            <div class="time-column" id="time-column"></div>
-            <div class="calendar-grid" id="calendar-grid"></div>
-          </div>
+          <div class="weeks-stack" id="weeks-stack"></div>
         </section>
       </main>
     </div>
@@ -107,6 +93,19 @@
           <input class="task-hours" type="number" min="0.25" step="0.01" value="1" />
         </div>
       </label>
+    </template>
+
+    <template id="week-template">
+      <section class="week-section">
+        <div class="week-heading">
+          <p class="eyebrow week-label"></p>
+          <h2 class="week-range"></h2>
+        </div>
+        <div class="calendar-shell">
+          <div class="time-column"></div>
+          <div class="calendar-grid"></div>
+        </div>
+      </section>
     </template>
 
     <template id="day-column-template">

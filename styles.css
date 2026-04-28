@@ -3,11 +3,8 @@
   --muted: #64748b;
   --line: rgba(100, 116, 139, 0.18);
   --surface: rgba(248, 250, 252, 0.96);
-  --surface-strong: #ffffff;
   --accent: #2563eb;
   --accent-deep: #1d4ed8;
-  --accent-soft: #dbeafe;
-  --sky: #e0f2fe;
   --warning: #eff6ff;
   --warning-ink: #1e3a8a;
   --shadow: 0 24px 60px rgba(15, 23, 42, 0.10);
@@ -49,7 +46,8 @@ button {
 .task-row,
 .summary-chip,
 .calendar-day,
-.session-block {
+.session-block,
+.week-section {
   border: 1px solid var(--line);
   border-radius: 24px;
   background: var(--surface);
@@ -57,18 +55,7 @@ button {
 }
 
 .hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 28px;
-}
-
-.hero-note {
-  width: 300px;
-  padding: 18px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.96));
-  border: 1px solid rgba(100, 116, 139, 0.12);
+  padding: 24px 28px;
 }
 
 .eyebrow,
@@ -93,22 +80,20 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(2.8rem, 6vw, 4.8rem);
-  line-height: 0.96;
+  font-size: clamp(2.4rem, 6vw, 4rem);
 }
 
 h2 {
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
 }
 
-.hero-text,
-.hero-note p,
 .helper-text,
 .break-note,
 .session-time,
-.session-length {
+.session-length,
+.week-range {
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .layout {
@@ -123,9 +108,10 @@ h2 {
 }
 
 .planner-form,
-.task-list {
+.task-list,
+.weeks-stack {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .setup-grid {
@@ -135,16 +121,12 @@ h2 {
 }
 
 .break-note {
-  margin: 4px 0 6px;
+  margin: 2px 0 6px;
   font-size: 0.92rem;
 }
 
-.section-heading {
-  margin-bottom: 18px;
-}
-
 .section-heading.compact {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 label {
@@ -176,6 +158,10 @@ select:focus {
   width: auto;
 }
 
+.task-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .task-row {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -196,11 +182,6 @@ select:focus {
   font-weight: 800;
   color: var(--muted);
   text-transform: uppercase;
-}
-
-.task-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
 }
 
 .button-row {
@@ -259,6 +240,16 @@ select:focus {
   border: 1px solid rgba(37, 99, 235, 0.14);
 }
 
+.week-section {
+  padding: 18px;
+}
+
+.week-heading {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
 .calendar-shell {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
@@ -271,12 +262,10 @@ select:focus {
 .time-column {
   position: relative;
   height: 720px;
-  border-radius: 22px;
 }
 
 .time-label {
   position: absolute;
-  left: 0;
   width: 100%;
   padding-right: 6px;
   text-align: right;
@@ -304,7 +293,6 @@ select:focus {
 .calendar-day-meta {
   display: grid;
   gap: 4px;
-  min-width: 0;
 }
 
 .calendar-day-toggle {
@@ -322,8 +310,6 @@ select:focus {
 
 .day-place-button {
   grid-column: 1 / -1;
-  padding: 10px 12px;
-  text-align: center;
   width: 100%;
 }
 
@@ -399,7 +385,6 @@ select:focus {
 .availability-length {
   color: var(--accent-deep);
   font-size: 1rem;
-  line-height: 1;
 }
 
 .break-block {
@@ -494,15 +479,8 @@ select:focus {
     display: grid;
   }
 
-  .hero {
-    padding: 20px;
-  }
-
-  .hero-note {
-    width: auto;
-  }
-
-  .panel {
+  .panel,
+  .week-section {
     padding: 18px;
   }
 
@@ -514,12 +492,9 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .calendar-grid {
-    min-width: 0;
-    grid-template-columns: 1fr;
-  }
-
+  .calendar-grid,
   .task-list {
+    min-width: 0;
     grid-template-columns: 1fr;
   }
 }
@@ -547,6 +522,7 @@ select:focus {
   }
 
   .panel,
+  .week-section,
   .summary-chip,
   .calendar-day,
   .session-block {
