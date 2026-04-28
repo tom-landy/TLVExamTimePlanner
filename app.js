@@ -2,6 +2,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const WEEKS = 4;
 const TOTAL_DAYS = DAYS.length * WEEKS;
 const TASK_COUNT = 6;
+const READING_MINUTES = 30;
 const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
 const DAY_RANGE = DAY_END - DAY_START;
@@ -301,7 +302,7 @@ function placeTask(config, taskIndex, startDayIndex) {
       continue;
     }
 
-    const freeSegments = getFreeSegments(day, dayIndex);
+    const freeSegments = getFreeSegments(day, dayIndex, config);
 
     for (const segment of freeSegments) {
       if (remainingMinutes <= 0) {
@@ -326,8 +327,8 @@ function placeTask(config, taskIndex, startDayIndex) {
   return { remainingMinutes: 0, message: `${task.name} placed into the calendars.` };
 }
 
-function getFreeSegments(day, dayIndex) {
-  const workingSegments = getWorkingSegments(day);
+function getFreeSegments(day, dayIndex, config) {
+  const workingSegments = getWorkingSegments(day, config);
   const placements = state.placements
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
@@ -406,13 +407,13 @@ function renderPrintSheet(config) {
   } else {
     placements.forEach((placement) => {
       const day = config.days[placement.dayIndex];
-      const task = config.tasks[placement.taskIndex];
+      const taskLabel = placement.kind === "reading" ? placement.label : config.tasks[placement.taskIndex]?.name;
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>Week ${day.weekIndex + 1}</td>
         <td>${escapeHtml(day.name)}</td>
         <td>${escapeHtml(formatLongDate(day.date))}</td>
-        <td>${escapeHtml(task.name)}</td>
+        <td>${escapeHtml(taskLabel || "")}</td>
         <td>${escapeHtml(fromMinutes(placement.startMinutes))}</td>
         <td>${escapeHtml(fromMinutes(placement.endMinutes))}</td>
         <td>${escapeHtml(formatMinutes(placement.endMinutes - placement.startMinutes))}</td>
@@ -427,7 +428,7 @@ function renderPrintSheet(config) {
 
 function renderSummary(config) {
   const totalCapacity = config.days.reduce(
-    (total, day) => total + getWorkingSegments(day).reduce((sum, segment) => sum + (segment.end - segment.start), 0),
+    (total, day) => total + getWorkingSegments(day, config).reduce((sum, segment) => sum + (segment.end - segment.start), 0),
     0,
   );
   const totalTaskMinutes = config.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
@@ -517,7 +518,7 @@ function renderDay(day, config) {
   grid.replaceChildren(...lines);
 
   if (day.enabled) {
-    getWorkingSegments(day).forEach((segment) => {
+    getWorkingSegments(day, config).forEach((segment) => {
       const availability = document.createElement("div");
       availability.className = "availability-block";
       availability.style.top = `${minuteToPercent(segment.start)}%`;
@@ -544,12 +545,15 @@ function renderDay(day, config) {
     availabilityLayer.append(offsite);
   }
 
-  const placements = state.placements.filter((placement) => placement.dayIndex === day.index).sort((a, b) => a.startMinutes - b.startMinutes);
+  const placements = getScheduledPlacements(config)
+    .filter((placement) => placement.dayIndex === day.index)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
 
   placements.forEach((placement) => {
-    const task = config.tasks[placement.taskIndex];
     const session = document.createElement("article");
-    session.className = "session-block";
+    const isReading = placement.kind === "reading";
+    const task = isReading ? { name: placement.label } : config.tasks[placement.taskIndex];
+    session.className = `session-block${isReading ? " reading-session" : ""}`;
     session.style.top = `${minuteToPercent(placement.startMinutes)}%`;
     session.style.height = `${durationToPercent(placement.endMinutes - placement.startMinutes)}%`;
     session.innerHTML = `
@@ -591,7 +595,7 @@ function renderWarning(config) {
 }
 
 function getSortedPlacements(config) {
-  return [...state.placements].sort((a, b) => {
+  return [...getScheduledPlacements(config)].sort((a, b) => {
     const dayDelta = a.dayIndex - b.dayIndex;
     if (dayDelta !== 0) {
       return dayDelta;
@@ -602,13 +606,93 @@ function getSortedPlacements(config) {
       return startDelta;
     }
 
-    const taskA = config.tasks[a.taskIndex]?.name || "";
-    const taskB = config.tasks[b.taskIndex]?.name || "";
+    const taskA = a.kind === "reading" ? a.label : config.tasks[a.taskIndex]?.name || "";
+    const taskB = b.kind === "reading" ? b.label : config.tasks[b.taskIndex]?.name || "";
     return taskA.localeCompare(taskB);
   });
 }
 
-function getWorkingSegments(day) {
+function getScheduledPlacements(config) {
+  return [...getReadingPlacements(config), ...state.placements];
+}
+
+function getReadingPlacements(config) {
+  const firstEnabledDay = config.days.find((day) => day.enabled);
+  if (!firstEnabledDay) {
+    return [];
+  }
+
+  const baseSegments = getBaseWorkingSegments(firstEnabledDay, { skipFirstBreakBuffer: true });
+  if (baseSegments.length === 0) {
+    return [];
+  }
+
+  const readingLabel = "Reading";
+  let remainingMinutes = getReadingMinutes(config.timingType);
+  const placements = [];
+
+  for (const segment of baseSegments) {
+    if (remainingMinutes <= 0) {
+      break;
+    }
+
+    const usedMinutes = Math.min(segment.end - segment.start, remainingMinutes);
+    placements.push({
+      kind: "reading",
+      label: readingLabel,
+      dayIndex: firstEnabledDay.index,
+      startMinutes: segment.start,
+      endMinutes: segment.start + usedMinutes,
+    });
+    remainingMinutes -= usedMinutes;
+  }
+
+  return placements;
+}
+
+function getReadingMinutes(timingType) {
+  return timingType === "extra" ? Math.round(READING_MINUTES * 1.25) : READING_MINUTES;
+}
+
+function getIntroBlockedUntil(day, config) {
+  const firstEnabledDay = config.days.find((candidate) => candidate.enabled);
+  if (!firstEnabledDay || firstEnabledDay.index !== day.index) {
+    return null;
+  }
+
+  const readingPlacements = getReadingPlacements(config);
+  if (readingPlacements.length === 0) {
+    return null;
+  }
+
+  const readingEnd = Math.max(...readingPlacements.map((placement) => placement.endMinutes));
+  const firstBreakEnd = BREAKS[0].end;
+  return readingEnd < firstBreakEnd ? firstBreakEnd : readingEnd;
+}
+
+function getWorkingSegments(day, config = null) {
+  const firstEnabledDayIndex = config ? config.days.find((candidate) => candidate.enabled)?.index : null;
+  const isFirstEnabledDay = firstEnabledDayIndex === day.index;
+  let segments = getBaseWorkingSegments(day, { skipFirstBreakBuffer: isFirstEnabledDay });
+
+  if (!config) {
+    return segments;
+  }
+
+  const blockedUntil = getIntroBlockedUntil(day, config);
+  if (!blockedUntil) {
+    return segments;
+  }
+
+  return segments
+    .map((segment) => ({
+      start: Math.max(segment.start, blockedUntil),
+      end: segment.end,
+    }))
+    .filter((segment) => segment.end > segment.start);
+}
+
+function getBaseWorkingSegments(day, options = {}) {
   if (!day.enabled) {
     return [];
   }
@@ -619,11 +703,23 @@ function getWorkingSegments(day) {
     segments = segments.flatMap((segment) => subtractSegment(segment, breakSlot));
   });
 
+  return applySegmentBuffers(day, segments, options);
+}
+
+function applySegmentBuffers(day, segments, options = {}) {
+  const { skipFirstBreakBuffer = false } = options;
+
   return segments
-    .map((segment) => ({
-      start: Math.min(segment.end, segment.start + BUFFER_MINUTES),
-      end: segment.end,
-    }))
+    .map((segment) => {
+      const needsBuffer =
+        segment.start === day.startMinutes ||
+        !(skipFirstBreakBuffer && segment.start === BREAKS[0].end);
+
+      return {
+        start: needsBuffer ? Math.min(segment.end, segment.start + BUFFER_MINUTES) : segment.start,
+        end: segment.end,
+      };
+    })
     .filter((segment) => segment.end > segment.start);
 }
 
@@ -662,7 +758,12 @@ function isPlacementValid(day, placement) {
     return false;
   }
 
-  return getWorkingSegments(day).some(
+  const config = readForm();
+  if (!config.valid) {
+    return false;
+  }
+
+  return getWorkingSegments(day, config).some(
     (segment) => placement.startMinutes >= segment.start && placement.endMinutes <= segment.end,
   );
 }
