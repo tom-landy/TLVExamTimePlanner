@@ -9,6 +9,10 @@ const BREAKS = [
   { start: toMinutes("13:35"), end: toMinutes("14:20"), label: "Lunch" },
   { start: toMinutes("15:20"), end: toMinutes("15:25"), label: "Break" },
 ];
+const EXAM_TASKS = {
+  ESP: ["Task 1.1", "Task 1.2", "Task 1.3", "Task 1.4", "Task 2.1", "Task 2.2"],
+  OSP: ["Task 1", "Task 2", "Task 3", "Task 4", "Task 5", "Task 6"],
+};
 
 const state = {
   placements: [],
@@ -18,6 +22,7 @@ const els = {
   form: document.querySelector("#planner-form"),
   studentName: document.querySelector("#student-name"),
   weekStart: document.querySelector("#week-start"),
+  examType: document.querySelector("#exam-type"),
   dayInputs: document.querySelector("#day-inputs"),
   taskList: document.querySelector("#task-list"),
   placeTaskButton: document.querySelector("#place-task-button"),
@@ -51,8 +56,8 @@ function bindEvents() {
   els.autoPlaceButton.addEventListener("click", handleAutoPlaceAll);
   els.clearButton.addEventListener("click", handleClearCalendar);
   els.printButton.addEventListener("click", handlePrint);
-  els.form.addEventListener("input", handleLiveUpdate);
   els.form.addEventListener("change", handleLiveUpdate);
+  els.examType.addEventListener("change", handleExamTypeChange);
   els.weekStart.addEventListener("change", () => {
     renderDayDates();
     refreshCalendar();
@@ -90,21 +95,14 @@ function renderDayDates() {
 }
 
 function renderTaskRows() {
-  const defaultTasks = [
-    ["Task 1", 2],
-    ["Task 2", 2],
-    ["Task 3", 1.5],
-    ["Task 4", 1],
-    ["Task 5", 1],
-    ["Task 6", 1],
-  ];
+  const defaultDurations = [2, 2, 1.5, 1, 1, 1];
+  const taskNames = getExamTaskNames(els.examType.value);
 
   const nodes = Array.from({ length: TASK_COUNT }, (_, index) => {
     const node = els.taskRowTemplate.content.firstElementChild.cloneNode(true);
-    const [name, hours] = defaultTasks[index];
     node.querySelector(".task-number").textContent = `Task ${index + 1}`;
-    node.querySelector(".task-name").value = name;
-    node.querySelector(".task-hours").value = hours;
+    node.querySelector(".task-name").value = taskNames[index];
+    node.querySelector(".task-hours").value = defaultDurations[index];
     node.querySelector(".task-select").value = String(index);
 
     if (index === 0) {
@@ -131,6 +129,23 @@ function handleLiveUpdate(event) {
     return;
   }
 
+  if (event.target instanceof HTMLInputElement && event.target.type === "time" && !isCompleteTimeValue(event.target.value)) {
+    return;
+  }
+
+  refreshCalendar();
+}
+
+function handleExamTypeChange() {
+  const durations = Array.from(els.taskList.children).map((node) => node.querySelector(".task-hours").value || "1");
+  const taskNames = getExamTaskNames(els.examType.value);
+
+  Array.from(els.taskList.children).forEach((node, index) => {
+    node.querySelector(".task-name").value = taskNames[index];
+    node.querySelector(".task-hours").value = durations[index] || "1";
+  });
+
+  state.placements = [];
   refreshCalendar();
 }
 
@@ -250,6 +265,7 @@ function readForm() {
   return {
     valid: true,
     studentName: els.studentName.value.trim() || "Student",
+    examType: els.examType.value,
     weekStart: els.weekStart.value,
     days,
     tasks,
@@ -354,6 +370,7 @@ function renderSummary(config) {
 
   const chips = [
     config.studentName,
+    `Exam: ${config.examType}`,
     `Available this week: ${formatMinutes(totalCapacity)}`,
     `Task time entered: ${formatMinutes(totalTaskMinutes)}`,
     `Task time placed: ${formatMinutes(placedMinutes)}`,
@@ -374,8 +391,8 @@ function renderWeek(config) {
     endInput.value = day.end || "16:30";
     startInput.disabled = !day.enabled;
     endInput.disabled = !day.enabled;
-    startInput.addEventListener("input", () => updateDayTimeFromCalendar(dayIndex, "start", startInput.value));
-    endInput.addEventListener("input", () => updateDayTimeFromCalendar(dayIndex, "end", endInput.value));
+    startInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "start", startInput.value));
+    endInput.addEventListener("change", () => updateDayTimeFromCalendar(dayIndex, "end", endInput.value));
 
     const grid = node.querySelector(".calendar-track-grid");
     const availabilityLayer = node.querySelector(".availability-layer");
@@ -590,6 +607,10 @@ function renderSummaryChip(text) {
   return chip;
 }
 
+function getExamTaskNames(examType) {
+  return EXAM_TASKS[examType] || EXAM_TASKS.ESP;
+}
+
 function minuteToPercent(minutes) {
   return ((minutes - DAY_START) / DAY_RANGE) * 100;
 }
@@ -649,6 +670,10 @@ function fromMinutes(totalMinutes) {
 
 function invalid(message) {
   return { valid: false, message };
+}
+
+function isCompleteTimeValue(value) {
+  return /^\d{2}:\d{2}$/.test(value);
 }
 
 function escapeHtml(value) {

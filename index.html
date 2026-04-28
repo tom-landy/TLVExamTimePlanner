@@ -23,8 +23,8 @@
           <p class="eyebrow">One Week View</p>
           <h1>Weekly exam task calendar</h1>
           <p class="hero-text">
-            Enter when the student is on site, name up to six tasks, then place them into the normal timetable and
-            see how they flow across the week.
+            Choose one exam, enter when the student is on site, then place that exam's tasks into the normal
+            timetable and see how they flow across the week.
           </p>
         </div>
         <div class="hero-note">
@@ -49,6 +49,14 @@
             <label>
               Week starting
               <input id="week-start" type="date" required />
+            </label>
+
+            <label>
+              Exam
+              <select id="exam-type">
+                <option value="ESP">ESP</option>
+                <option value="OSP">OSP</option>
+              </select>
             </label>
 
             <div class="section-heading compact">
