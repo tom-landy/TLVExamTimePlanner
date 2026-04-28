@@ -331,6 +331,18 @@ function getFreeSegments(day, dayIndex, config) {
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
+  return subtractPlacementsFromSegments(workingSegments, placements);
+}
+
+function getRemainingAvailabilitySegments(day, dayIndex, config) {
+  const workingSegments = getWorkingSegments(day, config);
+  const placements = getScheduledPlacements(config)
+    .filter((placement) => placement.dayIndex === dayIndex)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
+  return subtractPlacementsFromSegments(workingSegments, placements);
+}
+
+function subtractPlacementsFromSegments(workingSegments, placements) {
   const segments = [];
 
   for (const workingSegment of workingSegments) {
@@ -497,7 +509,7 @@ function renderDay(day, config) {
   grid.replaceChildren(...lines);
 
   if (day.enabled) {
-    getWorkingSegments(day, config).forEach((segment) => {
+    getRemainingAvailabilitySegments(day, day.index, config).forEach((segment) => {
       const availability = document.createElement("div");
       availability.className = "availability-block";
       availability.style.top = `${minuteToPercent(segment.start)}%`;
