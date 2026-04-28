@@ -510,22 +510,33 @@ function renderDay(day, config) {
 
   if (day.enabled) {
     getRemainingAvailabilitySegments(day, day.index, config).forEach((segment) => {
+      const durationMinutes = segment.end - segment.start;
       const availability = document.createElement("div");
       availability.className = "availability-block";
+      if (durationMinutes <= 70) {
+        availability.classList.add("availability-compact");
+      }
+      if (durationMinutes <= 35) {
+        availability.classList.add("availability-tight");
+      }
       availability.style.top = `${minuteToPercent(segment.start)}%`;
-      availability.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+      availability.style.height = `${durationToPercent(durationMinutes)}%`;
       availability.innerHTML = `
         <span class="availability-time">${fromMinutes(segment.start)} to ${fromMinutes(segment.end)}</span>
-        <strong class="availability-length">${formatSegmentMinutes(segment.end - segment.start)}</strong>
+        <strong class="availability-length">${formatSegmentMinutes(durationMinutes)}</strong>
       `;
       availabilityLayer.append(availability);
     });
 
     getBreakSegments(day).forEach((segment) => {
+      const durationMinutes = segment.end - segment.start;
       const breakBlock = document.createElement("div");
       breakBlock.className = "break-block";
+      if (durationMinutes <= 20) {
+        breakBlock.classList.add("break-compact");
+      }
       breakBlock.style.top = `${minuteToPercent(segment.start)}%`;
-      breakBlock.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+      breakBlock.style.height = `${durationToPercent(durationMinutes)}%`;
       breakBlock.textContent = segment.label;
       availabilityLayer.append(breakBlock);
     });

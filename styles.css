@@ -417,7 +417,6 @@ select:focus {
   background: linear-gradient(180deg, rgba(219, 234, 254, 0.72), rgba(224, 242, 254, 0.78));
   border: 1px solid rgba(37, 99, 235, 0.16);
   z-index: 1;
-  min-height: 78px;
 }
 
 .availability-time {
@@ -430,6 +429,32 @@ select:focus {
 .availability-length {
   color: var(--accent-deep);
   font-size: 1.18rem;
+}
+
+.availability-compact {
+  gap: 4px;
+  padding: 6px 7px;
+}
+
+.availability-compact .availability-time {
+  font-size: 0.72rem;
+}
+
+.availability-compact .availability-length {
+  font-size: 0.94rem;
+}
+
+.availability-tight {
+  gap: 2px;
+  padding: 4px 6px;
+}
+
+.availability-tight .availability-time {
+  font-size: 0.68rem;
+}
+
+.availability-tight .availability-length {
+  display: none;
 }
 
 .break-block {
@@ -448,7 +473,11 @@ select:focus {
   background: rgba(224, 242, 254, 0.95);
   border: 1px solid rgba(30, 58, 138, 0.14);
   z-index: 2;
-  min-height: 52px;
+}
+
+.break-compact {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
 }
 
 .offsite-note {
