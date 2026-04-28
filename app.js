@@ -334,14 +334,6 @@ function getFreeSegments(day, dayIndex, config) {
   return subtractPlacementsFromSegments(workingSegments, placements);
 }
 
-function getRemainingAvailabilitySegments(day, dayIndex, config) {
-  const workingSegments = getWorkingSegments(day, config);
-  const placements = getScheduledPlacements(config)
-    .filter((placement) => placement.dayIndex === dayIndex)
-    .sort((a, b) => a.startMinutes - b.startMinutes);
-  return subtractPlacementsFromSegments(workingSegments, placements);
-}
-
 function subtractPlacementsFromSegments(workingSegments, placements) {
   const segments = [];
 
@@ -509,25 +501,6 @@ function renderDay(day, config) {
   grid.replaceChildren(...lines);
 
   if (day.enabled) {
-    getRemainingAvailabilitySegments(day, day.index, config).forEach((segment) => {
-      const durationMinutes = segment.end - segment.start;
-      const availability = document.createElement("div");
-      availability.className = "availability-block";
-      if (durationMinutes <= 70) {
-        availability.classList.add("availability-compact");
-      }
-      if (durationMinutes <= 35) {
-        availability.classList.add("availability-tight");
-      }
-      availability.style.top = `${minuteToPercent(segment.start)}%`;
-      availability.style.height = `${durationToPercent(durationMinutes)}%`;
-      availability.innerHTML = `
-        <span class="availability-time">${fromMinutes(segment.start)} to ${fromMinutes(segment.end)}</span>
-        <strong class="availability-length">${formatSegmentMinutes(durationMinutes)}</strong>
-      `;
-      availabilityLayer.append(availability);
-    });
-
     getBreakSegments(day).forEach((segment) => {
       const durationMinutes = segment.end - segment.start;
       const breakBlock = document.createElement("div");
