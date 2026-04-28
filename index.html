@@ -42,8 +42,11 @@
 
           <form id="planner-form" class="planner-form">
             <label>
-              Student name
-              <input id="student-name" placeholder="Example: Jamie Smith" />
+              Candidate timing
+              <select id="timing-type">
+                <option value="standard">Standard</option>
+                <option value="extra">Extra</option>
+              </select>
             </label>
 
             <label>
@@ -61,7 +64,7 @@
 
             <p class="break-note">
               Use the calendar tick box to show whether the candidate is in that day. Fixed breaks are always removed:
-              11:10 to 11:25, 13:35 to 14:20, and 15:20 to 15:25.
+              11:10 to 11:25, 13:35 to 14:15, and 15:20 to 15:25.
             </p>
 
             <div class="section-heading compact">
@@ -109,7 +112,7 @@
         <div class="task-row-body">
           <span class="task-number"></span>
           <input class="task-name" placeholder="Task name" />
-          <input class="task-hours" type="number" min="0.25" step="0.25" value="1" />
+          <input class="task-hours" type="number" min="0.25" step="0.01" value="1" />
         </div>
       </label>
     </template>

@@ -6,16 +6,20 @@ const DAY_RANGE = DAY_END - DAY_START;
 const GRID_STEP = 30;
 const BREAKS = [
   { start: toMinutes("11:10"), end: toMinutes("11:25"), label: "Break" },
-  { start: toMinutes("13:35"), end: toMinutes("14:20"), label: "Lunch" },
+  { start: toMinutes("13:35"), end: toMinutes("14:15"), label: "Lunch" },
   { start: toMinutes("15:20"), end: toMinutes("15:25"), label: "Break" },
 ];
 const EXAM_TASKS = {
   ESP: ["Task 1.1", "Task 1.2", "Task 1.3", "Task 1.4", "Task 2.1", "Task 2.2"],
   OSP: ["Task 1", "Task 2", "Task 3", "Task 4", "Task 5", "Task 6"],
 };
-const EXAM_DEFAULT_HOURS = {
-  ESP: [8, 3.5, 4, 3.5, 2.5, 3.5],
-  OSP: [8, 6, 6, 3, 3, 6],
+const EXAM_TASK_MINUTES = {
+  ESP: [480, 210, 240, 210, 150, 210],
+  OSP: [480, 360, 360, 180, 180, 360],
+};
+const EXAM_EXTRA_EXEMPT_MINUTES = {
+  ESP: [0, 0, 0, 30, 30, 0],
+  OSP: [0, 0, 15, 0, 0, 0],
 };
 
 const state = {
@@ -25,7 +29,7 @@ const state = {
 
 const els = {
   form: document.querySelector("#planner-form"),
-  studentName: document.querySelector("#student-name"),
+  timingType: document.querySelector("#timing-type"),
   weekStart: document.querySelector("#week-start"),
   examType: document.querySelector("#exam-type"),
   taskList: document.querySelector("#task-list"),
@@ -69,6 +73,7 @@ function bindEvents() {
   els.clearButton.addEventListener("click", handleClearCalendar);
   els.printButton.addEventListener("click", handlePrint);
   els.examType.addEventListener("change", handleExamTypeChange);
+  els.timingType.addEventListener("change", handleExamTypeChange);
   els.weekStart.addEventListener("change", refreshCalendar);
 }
 
@@ -88,7 +93,7 @@ function renderTimeColumn() {
 
 function renderTaskRows() {
   const taskNames = getExamTaskNames(els.examType.value);
-  const defaultDurations = getExamDefaultHours(els.examType.value);
+  const defaultDurations = getExamDefaultHours(els.examType.value, els.timingType.value);
 
   const nodes = Array.from({ length: TASK_COUNT }, (_, index) => {
     const node = els.taskRowTemplate.content.firstElementChild.cloneNode(true);
@@ -130,7 +135,7 @@ function handleLiveUpdate(event) {
 
 function handleExamTypeChange() {
   const taskNames = getExamTaskNames(els.examType.value);
-  const durations = getExamDefaultHours(els.examType.value);
+  const durations = getExamDefaultHours(els.examType.value, els.timingType.value);
 
   Array.from(els.taskList.children).forEach((node, index) => {
     node.querySelector(".task-name").value = taskNames[index];
@@ -250,7 +255,7 @@ function readForm() {
 
   return {
     valid: true,
-    studentName: els.studentName.value.trim() || "Student",
+    timingType: els.timingType.value,
     examType: els.examType.value,
     weekStart: els.weekStart.value,
     days,
@@ -349,7 +354,7 @@ function renderSummary(config) {
   const placedMinutes = state.placements.reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
 
   const chips = [
-    config.studentName,
+    `Timing: ${capitalise(config.timingType)}`,
     `Exam: ${config.examType}`,
     `Available: ${formatMinutes(totalCapacity)}`,
     `Tasks entered: ${formatMinutes(totalTaskMinutes)}`,
@@ -601,8 +606,24 @@ function getExamTaskNames(examType) {
   return EXAM_TASKS[examType] || EXAM_TASKS.ESP;
 }
 
-function getExamDefaultHours(examType) {
-  return EXAM_DEFAULT_HOURS[examType] || EXAM_DEFAULT_HOURS.ESP;
+function getExamDefaultHours(examType, timingType) {
+  const minutes = getExamDefaultMinutes(examType, timingType);
+  return minutes.map((value) => formatHoursInput(value));
+}
+
+function getExamDefaultMinutes(examType, timingType) {
+  const base = EXAM_TASK_MINUTES[examType] || EXAM_TASK_MINUTES.ESP;
+  const exempt = EXAM_EXTRA_EXEMPT_MINUTES[examType] || EXAM_EXTRA_EXEMPT_MINUTES.ESP;
+
+  if (timingType !== "extra") {
+    return base;
+  }
+
+  return base.map((minutes, index) => {
+    const exemptMinutes = exempt[index] || 0;
+    const extendableMinutes = Math.max(0, minutes - exemptMinutes);
+    return Math.round(extendableMinutes * 1.25 + exemptMinutes);
+  });
 }
 
 function minuteToPercent(minutes) {
@@ -651,6 +672,11 @@ function formatSegmentMinutes(totalMinutes) {
   return `${totalMinutes}m`;
 }
 
+function formatHoursInput(totalMinutes) {
+  const hours = totalMinutes / 60;
+  return Number(hours.toFixed(2)).toString();
+}
+
 function toMinutes(value) {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
@@ -664,6 +690,14 @@ function fromMinutes(totalMinutes) {
 
 function invalid(message) {
   return { valid: false, message };
+}
+
+function capitalise(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function isCompleteTimeValue(value) {
