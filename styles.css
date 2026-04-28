@@ -104,6 +104,7 @@ h2 {
 .hero-text,
 .hero-note p,
 .helper-text,
+.break-note,
 .session-time,
 .session-length {
   color: var(--muted);
@@ -126,6 +127,11 @@ h2 {
 .task-list {
   display: grid;
   gap: 14px;
+}
+
+.break-note {
+  margin: -4px 0 4px;
+  font-size: 0.92rem;
 }
 
 .section-heading {
@@ -334,6 +340,23 @@ input:focus {
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(242, 198, 151, 0.55), rgba(223, 238, 227, 0.7));
   border: 1px solid rgba(185, 88, 51, 0.14);
+}
+
+.break-block {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--warning-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255, 241, 216, 0.9);
+  border: 1px solid rgba(142, 77, 5, 0.14);
 }
 
 .offsite-note {

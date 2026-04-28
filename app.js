@@ -4,6 +4,11 @@ const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
 const DAY_RANGE = DAY_END - DAY_START;
 const GRID_STEP = 30;
+const BREAKS = [
+  { start: toMinutes("11:10"), end: toMinutes("11:25"), label: "Break" },
+  { start: toMinutes("13:35"), end: toMinutes("14:20"), label: "Lunch" },
+  { start: toMinutes("15:20"), end: toMinutes("15:25"), label: "Break" },
+];
 
 const state = {
   placements: [],
@@ -285,23 +290,31 @@ function placeTask(config, taskIndex, startDayIndex) {
 }
 
 function getFreeSegments(day, dayIndex) {
+  const workingSegments = getWorkingSegments(day);
   const placements = state.placements
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
   const segments = [];
-  let cursor = day.startMinutes;
 
-  for (const placement of placements) {
-    if (placement.startMinutes > cursor) {
-      segments.push({ start: cursor, end: placement.startMinutes });
+  for (const workingSegment of workingSegments) {
+    let cursor = workingSegment.start;
+
+    for (const placement of placements) {
+      if (placement.endMinutes <= workingSegment.start || placement.startMinutes >= workingSegment.end) {
+        continue;
+      }
+
+      if (placement.startMinutes > cursor) {
+        segments.push({ start: cursor, end: placement.startMinutes });
+      }
+
+      cursor = Math.max(cursor, Math.min(placement.endMinutes, workingSegment.end));
     }
 
-    cursor = Math.max(cursor, placement.endMinutes);
-  }
-
-  if (cursor < day.endMinutes) {
-    segments.push({ start: cursor, end: day.endMinutes });
+    if (cursor < workingSegment.end) {
+      segments.push({ start: cursor, end: workingSegment.end });
+    }
   }
 
   return segments.filter((segment) => segment.end > segment.start);
@@ -316,7 +329,10 @@ function renderCalendar(config, message) {
 }
 
 function renderSummary(config) {
-  const totalCapacity = config.days.reduce((total, day) => total + (day.enabled ? day.endMinutes - day.startMinutes : 0), 0);
+  const totalCapacity = config.days.reduce(
+    (total, day) => total + getWorkingSegments(day).reduce((sum, segment) => sum + (segment.end - segment.start), 0),
+    0,
+  );
   const totalTaskMinutes = config.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
   const placedMinutes = state.placements.reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
 
@@ -351,11 +367,22 @@ function renderWeek(config) {
     grid.replaceChildren(...lines);
 
     if (day.enabled) {
-      const availability = document.createElement("div");
-      availability.className = "availability-block";
-      availability.style.top = `${minuteToPercent(day.startMinutes)}%`;
-      availability.style.height = `${durationToPercent(day.endMinutes - day.startMinutes)}%`;
-      availabilityLayer.append(availability);
+      getWorkingSegments(day).forEach((segment) => {
+        const availability = document.createElement("div");
+        availability.className = "availability-block";
+        availability.style.top = `${minuteToPercent(segment.start)}%`;
+        availability.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+        availabilityLayer.append(availability);
+      });
+
+      getBreakSegments(day).forEach((segment) => {
+        const breakBlock = document.createElement("div");
+        breakBlock.className = "break-block";
+        breakBlock.style.top = `${minuteToPercent(segment.start)}%`;
+        breakBlock.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+        breakBlock.textContent = segment.label;
+        availabilityLayer.append(breakBlock);
+      });
     } else {
       const offsite = document.createElement("div");
       offsite.className = "offsite-note";
@@ -412,6 +439,50 @@ function renderWarning(config) {
 
   els.warningBanner.textContent = warnings.join(". ");
   els.warningBanner.classList.remove("is-hidden");
+}
+
+function getWorkingSegments(day) {
+  if (!day.enabled) {
+    return [];
+  }
+
+  let segments = [{ start: day.startMinutes, end: day.endMinutes }];
+
+  BREAKS.forEach((breakSlot) => {
+    segments = segments.flatMap((segment) => subtractSegment(segment, breakSlot));
+  });
+
+  return segments.filter((segment) => segment.end > segment.start);
+}
+
+function getBreakSegments(day) {
+  if (!day.enabled) {
+    return [];
+  }
+
+  return BREAKS.map((breakSlot) => ({
+    start: Math.max(day.startMinutes, breakSlot.start),
+    end: Math.min(day.endMinutes, breakSlot.end),
+    label: breakSlot.label,
+  })).filter((segment) => segment.end > segment.start);
+}
+
+function subtractSegment(segment, blocked) {
+  if (blocked.end <= segment.start || blocked.start >= segment.end) {
+    return [segment];
+  }
+
+  const nextSegments = [];
+
+  if (blocked.start > segment.start) {
+    nextSegments.push({ start: segment.start, end: blocked.start });
+  }
+
+  if (blocked.end < segment.end) {
+    nextSegments.push({ start: blocked.end, end: segment.end });
+  }
+
+  return nextSegments;
 }
 
 function renderValidation(message) {
