@@ -372,6 +372,10 @@ function renderWeek(config) {
         availability.className = "availability-block";
         availability.style.top = `${minuteToPercent(segment.start)}%`;
         availability.style.height = `${durationToPercent(segment.end - segment.start)}%`;
+        availability.innerHTML = `
+          <span class="availability-time">${fromMinutes(segment.start)} to ${fromMinutes(segment.end)}</span>
+          <strong class="availability-length">${formatSegmentMinutes(segment.end - segment.start)}</strong>
+        `;
         availabilityLayer.append(availability);
       });
 
@@ -569,6 +573,10 @@ function formatMinutes(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function formatSegmentMinutes(totalMinutes) {
+  return `${totalMinutes}m`;
 }
 
 function toMinutes(value) {
