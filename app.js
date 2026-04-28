@@ -484,7 +484,6 @@ function renderDay(day, config) {
   const node = els.dayColumnTemplate.content.firstElementChild.cloneNode(true);
   node.querySelector(".calendar-day-name").textContent = day.name;
   node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
-  node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(day.index));
 
   const enabledInput = node.querySelector(".calendar-day-enabled");
   const bankHolidayToggle = node.querySelector(".bank-holiday-toggle");
@@ -810,23 +809,6 @@ function updateDayBankHoliday(dayIndex, enabled) {
   }
 
   refreshCalendar();
-}
-
-function placeSelectedFromDay(dayIndex) {
-  const config = readForm();
-  if (!config.valid) {
-    renderValidation(config.message);
-    return;
-  }
-
-  const selectedTaskIndex = getSelectedTaskIndex();
-  if (selectedTaskIndex === null) {
-    renderValidation("Choose a task first.");
-    return;
-  }
-
-  const placement = placeTask(config, selectedTaskIndex, dayIndex);
-  renderCalendars(config, placement.message);
 }
 
 function getSelectedTaskIndex() {

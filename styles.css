@@ -191,8 +191,7 @@ select:focus {
 }
 
 .primary-button,
-.ghost-button,
-.day-place-button {
+.ghost-button {
   border: 0;
   border-radius: 14px;
   padding: 13px 16px;
@@ -204,8 +203,7 @@ select:focus {
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
 }
 
-.ghost-button,
-.day-place-button {
+.ghost-button {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.86);
 }
@@ -288,6 +286,7 @@ select:focus {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   margin-bottom: 10px;
+  align-items: start;
 }
 
 .calendar-day-meta {
@@ -311,11 +310,6 @@ select:focus {
 .bank-holiday-toggle {
   background: rgba(254, 242, 242, 0.92);
   color: #991b1b;
-}
-
-.day-place-button {
-  grid-column: 1 / -1;
-  width: 100%;
 }
 
 .print-sheet {
