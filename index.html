@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>College Exam Time Planner</title>
+    <title>Weekly Exam Task Calendar</title>
     <meta
       name="description"
-      content="Plan two long exams across the college day, account for extra time, and print a simple timetable."
+      content="Enter student on-site hours, add up to six tasks, and place them into a one-week calendar."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,167 +19,127 @@
   <body>
     <div class="page-shell">
       <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Exam Scheduling</p>
-          <h1>College exam time planner</h1>
+        <div>
+          <p class="eyebrow">One Week View</p>
+          <h1>Weekly exam task calendar</h1>
           <p class="hero-text">
-            Build a simple printable list for long exams, split around the college day, and account for extra time
-            without working it out by hand.
+            Enter when the student is on site, name up to six tasks, then place them into the normal timetable and
+            see how they flow across the week.
           </p>
-          <div class="hero-notes">
-            <span class="chip">College day: 09:00 to 16:30</span>
-            <span class="chip">Breaks built in automatically</span>
-            <span class="chip">Print-friendly output</span>
-          </div>
         </div>
-
-        <aside class="hero-card">
-          <h2>Built-in day structure</h2>
-          <ul class="slot-list">
-            <li>09:00 to 11:10</li>
-            <li>11:25 to 13:35</li>
-            <li>14:20 to 15:20</li>
-            <li>15:25 to 16:30</li>
-          </ul>
-          <p class="small-copy">Usable exam time each day: 6 hours 25 minutes.</p>
-        </aside>
+        <div class="hero-note">
+          <strong>How it works</strong>
+          <p>Select a task on the left, then place it into the available timetable on the right.</p>
+        </div>
       </header>
 
       <main class="layout">
-        <section class="panel form-panel">
+        <section class="panel control-panel">
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">Inputs</p>
-              <h2>Planner details</h2>
-            </div>
+            <p class="eyebrow">Setup</p>
+            <h2>Student hours and tasks</h2>
           </div>
 
           <form id="planner-form" class="planner-form">
             <label>
-              Student or group name
-              <input id="student-name" name="studentName" placeholder="Example: Jamie Smith" />
+              Student name
+              <input id="student-name" placeholder="Example: Jamie Smith" />
             </label>
 
-            <div class="field-grid">
-              <label>
-                Exam 1 name
-                <input id="exam-one-name" name="examOneName" value="Exam 1" />
-              </label>
+            <label>
+              Week starting
+              <input id="week-start" type="date" required />
+            </label>
 
-              <label>
-                Exam 1 hours
-                <input id="exam-one-hours" name="examOneHours" type="number" min="0.5" step="0.25" value="25" />
-              </label>
+            <div class="section-heading compact">
+              <p class="eyebrow">On-site timetable</p>
             </div>
 
-            <div class="field-grid">
-              <label>
-                Exam 2 name
-                <input id="exam-two-name" name="examTwoName" value="Exam 2" />
-              </label>
+            <div class="day-inputs" id="day-inputs"></div>
 
-              <label>
-                Exam 2 hours
-                <input id="exam-two-hours" name="examTwoHours" type="number" min="0.5" step="0.25" value="32" />
-              </label>
+            <div class="section-heading compact">
+              <p class="eyebrow">Tasks</p>
+              <p class="small-copy">Choose one task, then place it into the calendar.</p>
             </div>
 
-            <div class="field-grid">
-              <label>
-                Extra time percentage
-                <input id="extra-time" name="extraTime" type="number" min="0" step="5" value="0" />
-              </label>
-
-              <label>
-                Schedule order
-                <select id="schedule-order" name="scheduleOrder">
-                  <option value="listed">Exam 1 then Exam 2</option>
-                  <option value="largest-first">Longest exam first</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="field-grid">
-              <label>
-                Start date
-                <input id="start-date" name="startDate" type="date" required />
-              </label>
-
-              <label>
-                End date
-                <input id="end-date" name="endDate" type="date" required />
-              </label>
-            </div>
-
-            <fieldset class="weekday-fieldset">
-              <legend>Available days</legend>
-              <div class="weekday-grid">
-                <label><input type="checkbox" name="weekday" value="1" checked /> Mon</label>
-                <label><input type="checkbox" name="weekday" value="2" checked /> Tue</label>
-                <label><input type="checkbox" name="weekday" value="3" checked /> Wed</label>
-                <label><input type="checkbox" name="weekday" value="4" checked /> Thu</label>
-                <label><input type="checkbox" name="weekday" value="5" checked /> Fri</label>
-              </div>
-            </fieldset>
+            <div class="task-list" id="task-list"></div>
 
             <div class="button-row">
-              <button class="primary-button" type="submit">Build printable plan</button>
+              <button class="primary-button" type="submit">Refresh calendar</button>
+              <button class="ghost-button" id="place-task-button" type="button">Place selected task</button>
+              <button class="ghost-button" id="auto-place-button" type="button">Auto place all</button>
+              <button class="ghost-button" id="clear-button" type="button">Clear calendar</button>
               <button class="ghost-button" id="print-button" type="button">Print</button>
             </div>
 
             <p class="helper-text" id="form-feedback">
-              Enter the dates and durations, then the planner will split each exam into day-by-day sittings.
+              The calendar only uses the hours you mark as on site. Tasks split automatically if they run out of room
+              in a day.
             </p>
           </form>
         </section>
 
-        <section class="panel output-panel">
+        <section class="panel calendar-panel">
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">Output</p>
-              <h2>Printable timetable</h2>
-            </div>
+            <p class="eyebrow">Calendar</p>
+            <h2>Student week</h2>
           </div>
 
-          <div class="summary-grid" id="summary-grid"></div>
+          <div class="summary-strip" id="summary-strip"></div>
           <div class="warning-banner is-hidden" id="warning-banner"></div>
-          <div class="schedule-list" id="schedule-list"></div>
 
-          <div class="empty-state" id="empty-state">
-            <h3>Your plan will appear here</h3>
-            <p>Use the default 25 and 32 hour exams or change them to match the real papers.</p>
+          <div class="calendar-shell" id="calendar-shell">
+            <div class="time-column" id="time-column"></div>
+            <div class="calendar-grid" id="calendar-grid"></div>
           </div>
         </section>
       </main>
     </div>
 
-    <template id="summary-card-template">
-      <article class="summary-card">
-        <p class="summary-label"></p>
-        <strong class="summary-value"></strong>
-      </article>
+    <template id="day-input-template">
+      <div class="day-input-card">
+        <div class="day-input-header">
+          <label class="checkbox-line">
+            <input class="day-enabled" type="checkbox" checked />
+            <span class="day-name"></span>
+          </label>
+          <span class="day-date"></span>
+        </div>
+        <div class="time-row">
+          <label>
+            Start
+            <input class="day-start" type="time" value="09:00" />
+          </label>
+          <label>
+            End
+            <input class="day-end" type="time" value="16:30" />
+          </label>
+        </div>
+      </div>
     </template>
 
-    <template id="day-card-template">
-      <article class="day-card">
-        <div class="day-card-header">
-          <div>
-            <p class="day-date"></p>
-            <h3 class="day-title"></h3>
-          </div>
-          <p class="day-total"></p>
+    <template id="task-row-template">
+      <label class="task-row">
+        <input class="task-select" type="radio" name="selectedTask" />
+        <div class="task-row-body">
+          <span class="task-number"></span>
+          <input class="task-name" placeholder="Task name" />
+          <input class="task-hours" type="number" min="0.25" step="0.25" value="1" />
         </div>
-        <table class="session-table">
-          <thead>
-            <tr>
-              <th>Exam</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Length</th>
-            </tr>
-          </thead>
-          <tbody class="session-body"></tbody>
-        </table>
+      </label>
+    </template>
+
+    <template id="day-column-template">
+      <article class="calendar-day">
+        <button class="day-place-button" type="button">
+          <span class="calendar-day-name"></span>
+          <span class="calendar-day-date"></span>
+        </button>
+        <div class="calendar-track">
+          <div class="calendar-track-grid"></div>
+          <div class="availability-layer"></div>
+          <div class="session-layer"></div>
+        </div>
       </article>
     </template>
 

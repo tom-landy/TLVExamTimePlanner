@@ -1,318 +1,489 @@
-const DAY_SLOTS = [
-  { start: "09:00", end: "11:10" },
-  { start: "11:25", end: "13:35" },
-  { start: "14:20", end: "15:20" },
-  { start: "15:25", end: "16:30" },
-];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const TASK_COUNT = 6;
+const DAY_START = 8 * 60;
+const DAY_END = 18 * 60;
+const DAY_RANGE = DAY_END - DAY_START;
+const GRID_STEP = 30;
 
-const MINUTES_PER_DAY = DAY_SLOTS.reduce((total, slot) => total + diffMinutes(slot.start, slot.end), 0);
-const DEFAULT_PLAN_LENGTH_DAYS = 28;
+const state = {
+  placements: [],
+};
 
 const els = {
   form: document.querySelector("#planner-form"),
   studentName: document.querySelector("#student-name"),
-  examOneName: document.querySelector("#exam-one-name"),
-  examOneHours: document.querySelector("#exam-one-hours"),
-  examTwoName: document.querySelector("#exam-two-name"),
-  examTwoHours: document.querySelector("#exam-two-hours"),
-  extraTime: document.querySelector("#extra-time"),
-  scheduleOrder: document.querySelector("#schedule-order"),
-  startDate: document.querySelector("#start-date"),
-  endDate: document.querySelector("#end-date"),
+  weekStart: document.querySelector("#week-start"),
+  dayInputs: document.querySelector("#day-inputs"),
+  taskList: document.querySelector("#task-list"),
+  placeTaskButton: document.querySelector("#place-task-button"),
+  autoPlaceButton: document.querySelector("#auto-place-button"),
+  clearButton: document.querySelector("#clear-button"),
   printButton: document.querySelector("#print-button"),
   formFeedback: document.querySelector("#form-feedback"),
-  summaryGrid: document.querySelector("#summary-grid"),
-  scheduleList: document.querySelector("#schedule-list"),
-  emptyState: document.querySelector("#empty-state"),
+  summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
-  summaryCardTemplate: document.querySelector("#summary-card-template"),
-  dayCardTemplate: document.querySelector("#day-card-template"),
+  timeColumn: document.querySelector("#time-column"),
+  calendarGrid: document.querySelector("#calendar-grid"),
+  dayInputTemplate: document.querySelector("#day-input-template"),
+  taskRowTemplate: document.querySelector("#task-row-template"),
+  dayColumnTemplate: document.querySelector("#day-column-template"),
 };
 
 initialise();
 
 function initialise() {
-  const today = new Date();
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + DEFAULT_PLAN_LENGTH_DAYS);
-
-  els.startDate.value = formatDateInput(today);
-  els.endDate.value = formatDateInput(endDate);
-
-  els.form.addEventListener("submit", handleSubmit);
-  els.printButton.addEventListener("click", handlePrint);
-
-  buildPlan();
+  els.weekStart.value = getCurrentMonday();
+  renderTimeColumn();
+  renderDayInputs();
+  renderTaskRows();
+  bindEvents();
+  refreshCalendar();
 }
 
-function handleSubmit(event) {
+function bindEvents() {
+  els.form.addEventListener("submit", handleRefresh);
+  els.placeTaskButton.addEventListener("click", handlePlaceSelectedTask);
+  els.autoPlaceButton.addEventListener("click", handleAutoPlaceAll);
+  els.clearButton.addEventListener("click", handleClearCalendar);
+  els.printButton.addEventListener("click", handlePrint);
+  els.weekStart.addEventListener("change", () => {
+    renderDayDates();
+    refreshCalendar();
+  });
+}
+
+function renderTimeColumn() {
+  const labels = [];
+
+  for (let minutes = DAY_START; minutes <= DAY_END; minutes += GRID_STEP) {
+    const label = document.createElement("div");
+    label.className = "time-label";
+    label.textContent = fromMinutes(minutes);
+    labels.push(label);
+  }
+
+  els.timeColumn.replaceChildren(...labels);
+}
+
+function renderDayInputs() {
+  const nodes = DAYS.map((day) => {
+    const node = els.dayInputTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector(".day-name").textContent = day;
+    return node;
+  });
+
+  els.dayInputs.replaceChildren(...nodes);
+  renderDayDates();
+}
+
+function renderDayDates() {
+  Array.from(els.dayInputs.children).forEach((node, index) => {
+    node.querySelector(".day-date").textContent = formatDate(addDays(els.weekStart.value || getCurrentMonday(), index));
+  });
+}
+
+function renderTaskRows() {
+  const defaultTasks = [
+    ["Task 1", 2],
+    ["Task 2", 2],
+    ["Task 3", 1.5],
+    ["Task 4", 1],
+    ["Task 5", 1],
+    ["Task 6", 1],
+  ];
+
+  const nodes = Array.from({ length: TASK_COUNT }, (_, index) => {
+    const node = els.taskRowTemplate.content.firstElementChild.cloneNode(true);
+    const [name, hours] = defaultTasks[index];
+    node.querySelector(".task-number").textContent = `Task ${index + 1}`;
+    node.querySelector(".task-name").value = name;
+    node.querySelector(".task-hours").value = hours;
+    node.querySelector(".task-select").value = String(index);
+
+    if (index === 0) {
+      node.querySelector(".task-select").checked = true;
+    }
+
+    return node;
+  });
+
+  els.taskList.replaceChildren(...nodes);
+}
+
+function handleRefresh(event) {
   event.preventDefault();
-  buildPlan();
+  refreshCalendar();
+}
+
+function handlePlaceSelectedTask() {
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  const selectedTaskIndex = getSelectedTaskIndex();
+  if (selectedTaskIndex === null) {
+    renderValidation("Choose a task first.");
+    return;
+  }
+
+  const placement = placeTask(config, selectedTaskIndex, 0);
+  renderCalendar(config, placement.message);
+}
+
+function handleAutoPlaceAll() {
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  state.placements = [];
+  let message = "All tasks placed into the student timetable.";
+
+  config.tasks.forEach((task, index) => {
+    if (!task.name || task.minutes <= 0) {
+      return;
+    }
+
+    const result = placeTask(config, index, 0);
+    if (result.remainingMinutes > 0) {
+      message = `${task.name} could not fully fit into this week.`;
+    }
+  });
+
+  renderCalendar(config, message);
+}
+
+function handleClearCalendar() {
+  state.placements = [];
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  renderCalendar(config, "Calendar cleared.");
 }
 
 function handlePrint() {
-  buildPlan();
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  renderCalendar(config, "Ready to print.");
   window.print();
 }
 
-function buildPlan() {
+function refreshCalendar() {
   const config = readForm();
-
   if (!config.valid) {
-    renderEmpty(config.message, true);
+    renderValidation(config.message);
     return;
   }
 
-  const result = createSchedule(config);
-  renderSchedule(result, config);
+  state.placements = state.placements.filter((placement) => {
+    const task = config.tasks[placement.taskIndex];
+    return task && task.name && task.minutes > 0;
+  });
+
+  renderCalendar(config, "Calendar refreshed.");
 }
 
 function readForm() {
-  const selectedWeekdays = Array.from(document.querySelectorAll('input[name="weekday"]:checked')).map((input) =>
-    Number(input.value),
-  );
-  const exams = [
-    {
-      name: cleanName(els.examOneName.value, "Exam 1"),
-      hours: Number(els.examOneHours.value),
-    },
-    {
-      name: cleanName(els.examTwoName.value, "Exam 2"),
-      hours: Number(els.examTwoHours.value),
-    },
-  ];
-
-  if (!els.startDate.value || !els.endDate.value) {
-    return invalid("Choose both a start date and an end date.");
+  if (!els.weekStart.value) {
+    return invalid("Choose the Monday for this week.");
   }
 
-  if (selectedWeekdays.length === 0) {
-    return invalid("Select at least one available day.");
+  const days = Array.from(els.dayInputs.children).map((node, index) => {
+    const enabled = node.querySelector(".day-enabled").checked;
+    const start = node.querySelector(".day-start").value;
+    const end = node.querySelector(".day-end").value;
+    return {
+      index,
+      name: DAYS[index],
+      date: addDays(els.weekStart.value, index),
+      enabled,
+      start,
+      end,
+      startMinutes: enabled ? toMinutes(start) : 0,
+      endMinutes: enabled ? toMinutes(end) : 0,
+    };
+  });
+
+  for (const day of days) {
+    if (day.enabled && (!day.start || !day.end || day.endMinutes <= day.startMinutes)) {
+      return invalid(`Check the on-site hours for ${day.name}.`);
+    }
   }
 
-  if (new Date(els.endDate.value) < new Date(els.startDate.value)) {
-    return invalid("The end date must be on or after the start date.");
-  }
-
-  if (exams.some((exam) => !Number.isFinite(exam.hours) || exam.hours <= 0)) {
-    return invalid("Each exam needs a duration greater than zero.");
-  }
-
-  const extraTimePercent = Math.max(0, Number(els.extraTime.value) || 0);
+  const tasks = Array.from(els.taskList.children).map((node, index) => ({
+    index,
+    name: node.querySelector(".task-name").value.trim(),
+    minutes: Math.round((Number(node.querySelector(".task-hours").value) || 0) * 60),
+  }));
 
   return {
     valid: true,
-    studentName: cleanName(els.studentName.value, "Student"),
-    exams,
-    extraTimePercent,
-    scheduleOrder: els.scheduleOrder.value,
-    startDate: els.startDate.value,
-    endDate: els.endDate.value,
-    selectedWeekdays,
-  };
-}
-
-function createSchedule(config) {
-  const multiplier = 1 + config.extraTimePercent / 100;
-  const orderedExams = orderExams(config.exams, config.scheduleOrder).map((exam) => ({
-    ...exam,
-    adjustedMinutes: Math.round(exam.hours * 60 * multiplier),
-    remainingMinutes: Math.round(exam.hours * 60 * multiplier),
-  }));
-
-  const availableDates = listAvailableDates(config.startDate, config.endDate, config.selectedWeekdays);
-  const days = [];
-
-  for (const date of availableDates) {
-    let remainingDayMinutes = MINUTES_PER_DAY;
-    const sessions = [];
-
-    for (const exam of orderedExams) {
-      if (exam.remainingMinutes <= 0 || remainingDayMinutes <= 0) {
-        continue;
-      }
-
-      for (const slot of DAY_SLOTS) {
-        const slotSessions = splitSlotForExam(date, slot, exam, remainingDayMinutes, sessions);
-        remainingDayMinutes -= slotSessions.usedMinutes;
-
-        if (slotSessions.session) {
-          sessions.push(slotSessions.session);
-        }
-
-        if (exam.remainingMinutes <= 0 || remainingDayMinutes <= 0) {
-          break;
-        }
-      }
-    }
-
-    if (sessions.length > 0) {
-      days.push({
-        date,
-        sessions,
-        totalMinutes: sessions.reduce((total, session) => total + session.lengthMinutes, 0),
-      });
-    }
-  }
-
-  const unscheduledMinutes = orderedExams.reduce((total, exam) => total + exam.remainingMinutes, 0);
-  const usedMinutes = orderedExams.reduce((total, exam) => total + (exam.adjustedMinutes - exam.remainingMinutes), 0);
-
-  return {
+    studentName: els.studentName.value.trim() || "Student",
+    weekStart: els.weekStart.value,
     days,
-    exams: orderedExams,
-    unscheduledMinutes,
-    usedMinutes,
-    availableDayCount: availableDates.length,
-    requiredDayCount: Math.ceil(
-      orderedExams.reduce((total, exam) => total + exam.adjustedMinutes, 0) / MINUTES_PER_DAY,
-    ),
+    tasks,
   };
 }
 
-function splitSlotForExam(date, slot, exam, remainingDayMinutes, existingSessions) {
-  if (exam.remainingMinutes <= 0 || remainingDayMinutes <= 0) {
-    return { session: null, usedMinutes: 0 };
+function placeTask(config, taskIndex, startDayIndex) {
+  const task = config.tasks[taskIndex];
+
+  if (!task || !task.name || task.minutes <= 0) {
+    return { remainingMinutes: 0, message: "Enter a task name and a length before placing it." };
   }
 
-  const slotStart = slot.start;
-  const slotEnd = slot.end;
-  const slotLength = diffMinutes(slotStart, slotEnd);
-  const usedInSlot = existingSessions
-    .filter((session) => session.slotStart === slot.start && session.slotEnd === slot.end)
-    .reduce((total, session) => total + session.lengthMinutes, 0);
-  const availableInSlot = slotLength - usedInSlot;
+  state.placements = state.placements.filter((placement) => placement.taskIndex !== taskIndex);
 
-  if (availableInSlot <= 0) {
-    return { session: null, usedMinutes: 0 };
+  let remainingMinutes = task.minutes;
+  const dayOrder = buildDayOrder(startDayIndex, config.days.length);
+
+  for (const dayIndex of dayOrder) {
+    const day = config.days[dayIndex];
+    if (!day.enabled || remainingMinutes <= 0) {
+      continue;
+    }
+
+    const freeSegments = getFreeSegments(day, dayIndex);
+
+    for (const segment of freeSegments) {
+      if (remainingMinutes <= 0) {
+        break;
+      }
+
+      const usedMinutes = Math.min(segment.end - segment.start, remainingMinutes);
+      state.placements.push({
+        taskIndex,
+        dayIndex,
+        startMinutes: segment.start,
+        endMinutes: segment.start + usedMinutes,
+      });
+      remainingMinutes -= usedMinutes;
+    }
   }
 
-  const lengthMinutes = Math.min(exam.remainingMinutes, remainingDayMinutes, availableInSlot);
-  const startMinutes = toMinutes(slotStart) + usedInSlot;
-  const endMinutes = startMinutes + lengthMinutes;
-
-  exam.remainingMinutes -= lengthMinutes;
+  if (remainingMinutes > 0) {
+    return {
+      remainingMinutes,
+      message: `${task.name} did not fully fit into this week.`,
+    };
+  }
 
   return {
-    usedMinutes: lengthMinutes,
-    session: {
-      examName: exam.name,
-      date,
-      start: fromMinutes(startMinutes),
-      end: fromMinutes(endMinutes),
-      lengthMinutes,
-      slotStart,
-      slotEnd,
-    },
+    remainingMinutes: 0,
+    message: `${task.name} placed into the calendar.`,
   };
 }
 
-function renderSchedule(result, config) {
-  const summaryCards = [
-    { label: "Student", value: config.studentName },
-    { label: "Extra time", value: `${config.extraTimePercent}%` },
-    { label: "Available days", value: String(result.availableDayCount) },
-    { label: "Days needed", value: String(result.requiredDayCount) },
-    { label: "Total scheduled", value: formatMinutes(result.usedMinutes) },
-  ].map(renderSummaryCard);
+function getFreeSegments(day, dayIndex) {
+  const placements = state.placements
+    .filter((placement) => placement.dayIndex === dayIndex)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
 
-  els.summaryGrid.replaceChildren(...summaryCards);
+  const segments = [];
+  let cursor = day.startMinutes;
 
-  if (result.unscheduledMinutes > 0) {
-    els.warningBanner.textContent =
-      `Not enough time in the selected date range. ${formatMinutes(result.unscheduledMinutes)} still needs scheduling.`;
-    els.warningBanner.classList.remove("is-hidden");
-  } else {
-    els.warningBanner.textContent = "";
-    els.warningBanner.classList.add("is-hidden");
+  for (const placement of placements) {
+    if (placement.startMinutes > cursor) {
+      segments.push({ start: cursor, end: placement.startMinutes });
+    }
+
+    cursor = Math.max(cursor, placement.endMinutes);
   }
 
-  const dayCards = result.days.map((day) => renderDayCard(day));
-  els.scheduleList.replaceChildren(...dayCards);
-  els.emptyState.classList.toggle("is-hidden", dayCards.length > 0);
-
-  if (dayCards.length === 0) {
-    renderEmpty("No sessions fit inside the selected dates and weekdays.", false);
-    return;
+  if (cursor < day.endMinutes) {
+    segments.push({ start: cursor, end: day.endMinutes });
   }
 
-  els.formFeedback.textContent =
-    `Planned ${result.exams.length} exams across ${result.days.length} day${result.days.length === 1 ? "" : "s"}.`;
+  return segments.filter((segment) => segment.end > segment.start);
+}
+
+function renderCalendar(config, message) {
+  renderSummary(config);
+  renderWeek(config);
+  renderWarning(config);
+  els.formFeedback.textContent = message;
   els.formFeedback.classList.remove("is-error");
 }
 
-function renderSummaryCard(item) {
-  const node = els.summaryCardTemplate.content.firstElementChild.cloneNode(true);
-  node.querySelector(".summary-label").textContent = item.label;
-  node.querySelector(".summary-value").textContent = item.value;
-  return node;
+function renderSummary(config) {
+  const totalCapacity = config.days.reduce((total, day) => total + (day.enabled ? day.endMinutes - day.startMinutes : 0), 0);
+  const totalTaskMinutes = config.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
+  const placedMinutes = state.placements.reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
+
+  const chips = [
+    config.studentName,
+    `Available this week: ${formatMinutes(totalCapacity)}`,
+    `Task time entered: ${formatMinutes(totalTaskMinutes)}`,
+    `Task time placed: ${formatMinutes(placedMinutes)}`,
+  ].map(renderSummaryChip);
+
+  els.summaryStrip.replaceChildren(...chips);
 }
 
-function renderDayCard(day) {
-  const node = els.dayCardTemplate.content.firstElementChild.cloneNode(true);
-  node.querySelector(".day-date").textContent = formatLongDate(day.date);
-  node.querySelector(".day-title").textContent = summariseDay(day.sessions);
-  node.querySelector(".day-total").textContent = formatMinutes(day.totalMinutes);
+function renderWeek(config) {
+  const nodes = config.days.map((day, dayIndex) => {
+    const node = els.dayColumnTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector(".calendar-day-name").textContent = day.name;
+    node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
+    node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(dayIndex));
 
-  const rows = day.sessions.map((session) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${escapeHtml(session.examName)}</td>
-      <td>${session.start}</td>
-      <td>${session.end}</td>
-      <td>${formatMinutes(session.lengthMinutes)}</td>
-    `;
-    return row;
-  });
+    const grid = node.querySelector(".calendar-track-grid");
+    const availabilityLayer = node.querySelector(".availability-layer");
+    const sessionLayer = node.querySelector(".session-layer");
 
-  node.querySelector(".session-body").replaceChildren(...rows);
-  return node;
-}
+    const lines = [];
+    for (let minutes = DAY_START; minutes < DAY_END; minutes += GRID_STEP) {
+      const line = document.createElement("div");
+      line.className = "calendar-line";
+      line.style.top = `${minuteToPercent(minutes)}%`;
+      lines.push(line);
+    }
+    grid.replaceChildren(...lines);
 
-function renderEmpty(message, isError) {
-  els.summaryGrid.replaceChildren();
-  els.scheduleList.replaceChildren();
-  els.emptyState.classList.remove("is-hidden");
-  els.warningBanner.classList.add("is-hidden");
-  els.formFeedback.textContent = message;
-  els.formFeedback.classList.toggle("is-error", isError);
-}
-
-function orderExams(exams, order) {
-  if (order === "largest-first") {
-    return [...exams].sort((a, b) => b.hours - a.hours);
-  }
-
-  return exams;
-}
-
-function listAvailableDates(startDate, endDate, selectedWeekdays) {
-  const dates = [];
-  const current = new Date(`${startDate}T12:00:00`);
-  const finalDate = new Date(`${endDate}T12:00:00`);
-
-  while (current <= finalDate) {
-    if (selectedWeekdays.includes(current.getDay())) {
-      dates.push(formatDateInput(current));
+    if (day.enabled) {
+      const availability = document.createElement("div");
+      availability.className = "availability-block";
+      availability.style.top = `${minuteToPercent(day.startMinutes)}%`;
+      availability.style.height = `${durationToPercent(day.endMinutes - day.startMinutes)}%`;
+      availabilityLayer.append(availability);
+    } else {
+      const offsite = document.createElement("div");
+      offsite.className = "offsite-note";
+      offsite.textContent = "Off site";
+      availabilityLayer.append(offsite);
     }
 
-    current.setDate(current.getDate() + 1);
+    const placements = state.placements
+      .filter((placement) => placement.dayIndex === dayIndex)
+      .sort((a, b) => a.startMinutes - b.startMinutes);
+
+    placements.forEach((placement) => {
+      const task = config.tasks[placement.taskIndex];
+      const session = document.createElement("article");
+      session.className = "session-block";
+      session.style.top = `${minuteToPercent(placement.startMinutes)}%`;
+      session.style.height = `${durationToPercent(placement.endMinutes - placement.startMinutes)}%`;
+      session.innerHTML = `
+        <p class="session-time">${fromMinutes(placement.startMinutes)} to ${fromMinutes(placement.endMinutes)}</p>
+        <h3>${escapeHtml(task.name)}</h3>
+        <p class="session-length">${formatMinutes(placement.endMinutes - placement.startMinutes)}</p>
+      `;
+      sessionLayer.append(session);
+    });
+
+    return node;
+  });
+
+  els.calendarGrid.replaceChildren(...nodes);
+}
+
+function renderWarning(config) {
+  const warnings = [];
+
+  config.tasks.forEach((task) => {
+    if (!task.name || task.minutes <= 0) {
+      return;
+    }
+
+    const placedMinutes = state.placements
+      .filter((placement) => placement.taskIndex === task.index)
+      .reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
+
+    if (placedMinutes < task.minutes) {
+      warnings.push(`${task.name} has ${formatMinutes(task.minutes - placedMinutes)} still unplaced`);
+    }
+  });
+
+  if (warnings.length === 0) {
+    els.warningBanner.classList.add("is-hidden");
+    els.warningBanner.textContent = "";
+    return;
   }
 
-  return dates;
+  els.warningBanner.textContent = warnings.join(". ");
+  els.warningBanner.classList.remove("is-hidden");
 }
 
-function summariseDay(sessions) {
-  const uniqueExams = [...new Set(sessions.map((session) => session.examName))];
-  return uniqueExams.join(" and ");
+function renderValidation(message) {
+  els.formFeedback.textContent = message;
+  els.formFeedback.classList.add("is-error");
 }
 
-function formatLongDate(dateString) {
+function placeSelectedFromDay(dayIndex) {
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  const selectedTaskIndex = getSelectedTaskIndex();
+  if (selectedTaskIndex === null) {
+    renderValidation("Choose a task first.");
+    return;
+  }
+
+  const placement = placeTask(config, selectedTaskIndex, dayIndex);
+  renderCalendar(config, placement.message);
+}
+
+function getSelectedTaskIndex() {
+  const selected = document.querySelector('input[name="selectedTask"]:checked');
+  return selected ? Number(selected.value) : null;
+}
+
+function buildDayOrder(startIndex, totalDays) {
+  const order = [];
+
+  for (let i = 0; i < totalDays; i += 1) {
+    order.push((startIndex + i) % totalDays);
+  }
+
+  return order;
+}
+
+function renderSummaryChip(text) {
+  const chip = document.createElement("div");
+  chip.className = "summary-chip";
+  chip.textContent = text;
+  return chip;
+}
+
+function minuteToPercent(minutes) {
+  return ((minutes - DAY_START) / DAY_RANGE) * 100;
+}
+
+function durationToPercent(minutes) {
+  return (minutes / DAY_RANGE) * 100;
+}
+
+function getCurrentMonday() {
+  const today = new Date();
+  const day = today.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  today.setDate(today.getDate() + offset);
+  return formatDateInput(today);
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatDateInput(date);
+}
+
+function formatDate(dateString) {
   return new Date(`${dateString}T12:00:00`).toLocaleDateString([], {
-    weekday: "long",
     day: "numeric",
-    month: "long",
-    year: "numeric",
+    month: "short",
   });
 }
 
@@ -326,27 +497,7 @@ function formatDateInput(date) {
 function formatMinutes(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-
-  if (minutes === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${minutes}m`;
-}
-
-function cleanName(value, fallback) {
-  return value.trim() || fallback;
-}
-
-function invalid(message) {
-  return {
-    valid: false,
-    message,
-  };
-}
-
-function diffMinutes(start, end) {
-  return toMinutes(end) - toMinutes(start);
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
 function toMinutes(value) {
@@ -358,6 +509,10 @@ function fromMinutes(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function invalid(message) {
+  return { valid: false, message };
 }
 
 function escapeHtml(value) {
