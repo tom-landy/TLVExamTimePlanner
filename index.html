@@ -135,10 +135,23 @@
 
     <template id="day-column-template">
       <article class="calendar-day">
-        <button class="day-place-button" type="button">
-          <span class="calendar-day-name"></span>
-          <span class="calendar-day-date"></span>
-        </button>
+        <div class="calendar-day-header">
+          <div class="calendar-day-meta">
+            <span class="calendar-day-name"></span>
+            <span class="calendar-day-date"></span>
+          </div>
+          <button class="day-place-button" type="button">Place task</button>
+        </div>
+        <div class="calendar-time-edit">
+          <label>
+            Start
+            <input class="calendar-day-start" type="time" />
+          </label>
+          <label>
+            End
+            <input class="calendar-day-end" type="time" />
+          </label>
+        </div>
         <div class="calendar-track">
           <div class="calendar-track-grid"></div>
           <div class="availability-layer"></div>

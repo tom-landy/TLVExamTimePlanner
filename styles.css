@@ -298,15 +298,45 @@ input:focus {
   padding: 12px;
 }
 
-.day-place-button {
-  width: 100%;
+.calendar-day-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 10px;
-  text-align: left;
+}
+
+.calendar-day-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.day-place-button {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  text-align: center;
 }
 
 .calendar-day-date {
   display: block;
   margin-top: 4px;
+}
+
+.calendar-time-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.calendar-time-edit label {
+  gap: 4px;
+  font-size: 0.78rem;
+}
+
+.calendar-time-edit input {
+  padding: 9px 10px;
+  font-size: 0.88rem;
 }
 
 .calendar-track {
@@ -446,6 +476,12 @@ input:focus {
   .calendar-shell,
   .summary-strip,
   .calendar-grid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .calendar-day-header,
+  .calendar-time-edit {
     grid-template-columns: 1fr;
     display: grid;
   }

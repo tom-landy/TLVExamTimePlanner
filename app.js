@@ -368,6 +368,14 @@ function renderWeek(config) {
     node.querySelector(".calendar-day-name").textContent = day.name;
     node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
     node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(dayIndex));
+    const startInput = node.querySelector(".calendar-day-start");
+    const endInput = node.querySelector(".calendar-day-end");
+    startInput.value = day.start || "09:00";
+    endInput.value = day.end || "16:30";
+    startInput.disabled = !day.enabled;
+    endInput.disabled = !day.enabled;
+    startInput.addEventListener("input", () => updateDayTimeFromCalendar(dayIndex, "start", startInput.value));
+    endInput.addEventListener("input", () => updateDayTimeFromCalendar(dayIndex, "end", endInput.value));
 
     const grid = node.querySelector(".calendar-track-grid");
     const availabilityLayer = node.querySelector(".availability-layer");
@@ -518,6 +526,29 @@ function subtractSegment(segment, blocked) {
 function renderValidation(message) {
   els.formFeedback.textContent = message;
   els.formFeedback.classList.add("is-error");
+}
+
+function updateDayTimeFromCalendar(dayIndex, field, value) {
+  const dayNode = els.dayInputs.children[dayIndex];
+  if (!dayNode) {
+    return;
+  }
+
+  const enabledInput = dayNode.querySelector(".day-enabled");
+  const startInput = dayNode.querySelector(".day-start");
+  const endInput = dayNode.querySelector(".day-end");
+
+  enabledInput.checked = true;
+
+  if (field === "start") {
+    startInput.value = value;
+  }
+
+  if (field === "end") {
+    endInput.value = value;
+  }
+
+  refreshCalendar();
 }
 
 function placeSelectedFromDay(dayIndex) {
