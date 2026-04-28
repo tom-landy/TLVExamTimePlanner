@@ -39,7 +39,7 @@ button {
 }
 
 .page-shell {
-  width: min(1440px, calc(100% - 32px));
+  width: min(1680px, calc(100% - 32px));
   margin: 0 auto;
   padding: 24px 0 40px;
 }
@@ -113,7 +113,7 @@ h2 {
 
 .layout {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 20px;
   margin-top: 20px;
 }
@@ -125,6 +125,12 @@ h2 {
 .planner-form,
 .task-list {
   display: grid;
+  gap: 14px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -192,9 +198,14 @@ select:focus {
   text-transform: uppercase;
 }
 
+.task-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -228,7 +239,7 @@ select:focus {
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -253,6 +264,8 @@ select:focus {
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+  overflow-x: auto;
+  padding-bottom: 8px;
 }
 
 .time-column {
@@ -269,8 +282,9 @@ select:focus {
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
   gap: 12px;
+  min-width: 1160px;
 }
 
 .calendar-day {
@@ -278,16 +292,16 @@ select:focus {
 }
 
 .calendar-day-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
 .calendar-day-meta {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .calendar-day-toggle {
@@ -300,12 +314,14 @@ select:focus {
   color: var(--ink);
   font-size: 0.82rem;
   font-weight: 800;
+  justify-self: start;
 }
 
 .day-place-button {
-  flex: 0 0 auto;
+  grid-column: 1 / -1;
   padding: 10px 12px;
   text-align: center;
+  width: 100%;
 }
 
 .calendar-day-date {
@@ -443,12 +459,9 @@ select:focus {
 }
 
 @media (max-width: 1180px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-strip,
-  .calendar-grid {
+  .setup-grid,
+  .task-list,
+  .button-row {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -460,11 +473,10 @@ select:focus {
   }
 
   .hero,
+  .setup-grid,
   .task-row-body,
   .button-row,
-  .calendar-shell,
   .summary-strip,
-  .calendar-grid,
   .calendar-day-header,
   .calendar-time-edit {
     grid-template-columns: 1fr;
@@ -485,6 +497,19 @@ select:focus {
 
   .time-column {
     display: none;
+  }
+
+  .calendar-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .task-list {
+    grid-template-columns: 1fr;
   }
 }
 
