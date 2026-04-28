@@ -59,7 +59,7 @@ function initialise() {
 }
 
 function initialiseDaySettings() {
-  state.daySettings = Array.from({ length: TOTAL_DAYS }, () => ({
+  state.daySettings = Array.from({ length: DAYS.length }, () => ({
     enabled: true,
     start: "09:00",
     end: "16:30",
@@ -227,23 +227,39 @@ function readForm() {
     return invalid("Choose the Monday for the first week.");
   }
 
-  const days = state.daySettings.map((daySetting, index) => ({
-    index,
-    name: DAYS[index % DAYS.length],
-    date: addPlannerDays(els.weekStart.value, index),
+  const weekdaySettings = state.daySettings.map((daySetting, index) => ({
+    weekdayIndex: index,
+    name: DAYS[index],
     enabled: daySetting.enabled,
     start: daySetting.start,
     end: daySetting.end,
     startMinutes: daySetting.enabled ? toMinutes(daySetting.start) : 0,
     endMinutes: daySetting.enabled ? toMinutes(daySetting.end) : 0,
-    weekIndex: Math.floor(index / DAYS.length),
   }));
 
-  for (const day of days) {
+  for (const day of weekdaySettings) {
     if (day.enabled && (!day.start || !day.end || day.endMinutes <= day.startMinutes)) {
-      return invalid(`Check the hours for ${day.name} in week ${day.weekIndex + 1}.`);
+      return invalid(`Check the hours for ${day.name}.`);
     }
   }
+
+  const days = Array.from({ length: TOTAL_DAYS }, (_, index) => {
+    const weekdayIndex = index % DAYS.length;
+    const weekday = weekdaySettings[weekdayIndex];
+
+    return {
+      index,
+      weekdayIndex,
+      name: weekday.name,
+      date: addPlannerDays(els.weekStart.value, index),
+      enabled: weekday.enabled,
+      start: weekday.start,
+      end: weekday.end,
+      startMinutes: weekday.startMinutes,
+      endMinutes: weekday.endMinutes,
+      weekIndex: Math.floor(index / DAYS.length),
+    };
+  });
 
   const tasks = Array.from(els.taskList.children).map((node, index) => ({
     index,
@@ -563,7 +579,7 @@ function renderValidation(message) {
 }
 
 function updateDayTimeFromCalendar(dayIndex, field, value) {
-  const daySetting = state.daySettings[dayIndex];
+  const daySetting = state.daySettings[dayIndex % DAYS.length];
   if (!daySetting) {
     return;
   }
@@ -582,7 +598,7 @@ function updateDayTimeFromCalendar(dayIndex, field, value) {
 }
 
 function updateDayEnabledFromCalendar(dayIndex, enabled) {
-  const daySetting = state.daySettings[dayIndex];
+  const daySetting = state.daySettings[dayIndex % DAYS.length];
   if (!daySetting) {
     return;
   }
