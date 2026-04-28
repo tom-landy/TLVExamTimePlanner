@@ -6,6 +6,7 @@ const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
 const DAY_RANGE = DAY_END - DAY_START;
 const GRID_STEP = 30;
+const BUFFER_MINUTES = 10;
 const BREAKS = [
   { start: toMinutes("11:10"), end: toMinutes("11:25"), label: "Break" },
   { start: toMinutes("13:35"), end: toMinutes("14:15"), label: "Lunch" },
@@ -27,6 +28,7 @@ const EXAM_EXTRA_EXEMPT_MINUTES = {
 const state = {
   placements: [],
   daySettings: [],
+  bankHolidayIndexes: new Set(),
 };
 
 const els = {
@@ -43,6 +45,7 @@ const els = {
   summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
   weeksStack: document.querySelector("#weeks-stack"),
+  printSheet: document.querySelector("#print-sheet"),
   taskRowTemplate: document.querySelector("#task-row-template"),
   weekTemplate: document.querySelector("#week-template"),
   dayColumnTemplate: document.querySelector("#day-column-template"),
@@ -203,6 +206,7 @@ function handlePrint() {
   }
 
   renderCalendars(config, "Ready to print.");
+  renderPrintSheet(config);
   window.print();
 }
 
@@ -246,18 +250,20 @@ function readForm() {
   const days = Array.from({ length: TOTAL_DAYS }, (_, index) => {
     const weekdayIndex = index % DAYS.length;
     const weekday = weekdaySettings[weekdayIndex];
+    const isBankHoliday = state.bankHolidayIndexes.has(index);
 
     return {
       index,
       weekdayIndex,
       name: weekday.name,
       date: addPlannerDays(els.weekStart.value, index),
-      enabled: weekday.enabled,
+      enabled: weekday.enabled && !isBankHoliday,
       start: weekday.start,
       end: weekday.end,
       startMinutes: weekday.startMinutes,
       endMinutes: weekday.endMinutes,
       weekIndex: Math.floor(index / DAYS.length),
+      isBankHoliday,
     };
   });
 
@@ -355,9 +361,68 @@ function renderCalendars(config, message) {
   renderSummary(config);
   renderWeeks(config);
   renderWarning(config);
+  renderPrintSheet(config);
   syncTimeColumnsOffsets();
   els.formFeedback.textContent = message;
   els.formFeedback.classList.remove("is-error");
+}
+
+function renderPrintSheet(config) {
+  const printSheet = els.printSheet;
+  const placements = getSortedPlacements(config);
+  const heading = document.createElement("div");
+  heading.className = "print-heading";
+  heading.innerHTML = `
+    <h2>TLV Exam Calendar</h2>
+    <div class="print-meta">
+      <span>Exam: ${escapeHtml(config.examType)}</span>
+      <span>Timing: ${escapeHtml(capitalise(config.timingType))}</span>
+      <span>Start week: ${escapeHtml(formatLongDate(config.weekStart))}</span>
+    </div>
+  `;
+
+  const table = document.createElement("table");
+  table.className = "print-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Week</th>
+        <th>Day</th>
+        <th>Date</th>
+        <th>Task</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+  `;
+
+  const tbody = document.createElement("tbody");
+
+  if (placements.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="7">No task sessions have been placed yet.</td>';
+    tbody.append(row);
+  } else {
+    placements.forEach((placement) => {
+      const day = config.days[placement.dayIndex];
+      const task = config.tasks[placement.taskIndex];
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>Week ${day.weekIndex + 1}</td>
+        <td>${escapeHtml(day.name)}</td>
+        <td>${escapeHtml(formatLongDate(day.date))}</td>
+        <td>${escapeHtml(task.name)}</td>
+        <td>${escapeHtml(fromMinutes(placement.startMinutes))}</td>
+        <td>${escapeHtml(fromMinutes(placement.endMinutes))}</td>
+        <td>${escapeHtml(formatMinutes(placement.endMinutes - placement.startMinutes))}</td>
+      `;
+      tbody.append(row);
+    });
+  }
+
+  table.append(tbody);
+  printSheet.replaceChildren(heading, table);
 }
 
 function renderSummary(config) {
@@ -421,14 +486,20 @@ function renderDay(day, config) {
   node.querySelector(".day-place-button").addEventListener("click", () => placeSelectedFromDay(day.index));
 
   const enabledInput = node.querySelector(".calendar-day-enabled");
+  const bankHolidayToggle = node.querySelector(".bank-holiday-toggle");
+  const bankHolidayInput = node.querySelector(".calendar-day-bank-holiday");
   const startInput = node.querySelector(".calendar-day-start");
   const endInput = node.querySelector(".calendar-day-end");
+  const isMonday = day.name === "Monday";
   enabledInput.checked = day.enabled;
+  bankHolidayInput.checked = day.isBankHoliday;
+  bankHolidayToggle.classList.toggle("is-hidden", !isMonday);
   startInput.value = day.start || "09:00";
   endInput.value = day.end || "16:30";
   startInput.disabled = !day.enabled;
   endInput.disabled = !day.enabled;
   enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(day.index, enabledInput.checked));
+  bankHolidayInput.addEventListener("change", () => updateDayBankHoliday(day.index, bankHolidayInput.checked));
   startInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "start", startInput.value));
   endInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "end", endInput.value));
 
@@ -469,7 +540,7 @@ function renderDay(day, config) {
   } else {
     const offsite = document.createElement("div");
     offsite.className = "offsite-note";
-    offsite.textContent = "Not in";
+    offsite.textContent = day.isBankHoliday ? "Bank holiday" : "Not in";
     availabilityLayer.append(offsite);
   }
 
@@ -519,6 +590,24 @@ function renderWarning(config) {
   els.warningBanner.classList.remove("is-hidden");
 }
 
+function getSortedPlacements(config) {
+  return [...state.placements].sort((a, b) => {
+    const dayDelta = a.dayIndex - b.dayIndex;
+    if (dayDelta !== 0) {
+      return dayDelta;
+    }
+
+    const startDelta = a.startMinutes - b.startMinutes;
+    if (startDelta !== 0) {
+      return startDelta;
+    }
+
+    const taskA = config.tasks[a.taskIndex]?.name || "";
+    const taskB = config.tasks[b.taskIndex]?.name || "";
+    return taskA.localeCompare(taskB);
+  });
+}
+
 function getWorkingSegments(day) {
   if (!day.enabled) {
     return [];
@@ -530,7 +619,12 @@ function getWorkingSegments(day) {
     segments = segments.flatMap((segment) => subtractSegment(segment, breakSlot));
   });
 
-  return segments.filter((segment) => segment.end > segment.start);
+  return segments
+    .map((segment) => ({
+      start: Math.min(segment.end, segment.start + BUFFER_MINUTES),
+      end: segment.end,
+    }))
+    .filter((segment) => segment.end > segment.start);
 }
 
 function getBreakSegments(day) {
@@ -604,6 +698,16 @@ function updateDayEnabledFromCalendar(dayIndex, enabled) {
   }
 
   daySetting.enabled = enabled;
+  refreshCalendar();
+}
+
+function updateDayBankHoliday(dayIndex, enabled) {
+  if (enabled) {
+    state.bankHolidayIndexes.add(dayIndex);
+  } else {
+    state.bankHolidayIndexes.delete(dayIndex);
+  }
+
   refreshCalendar();
 }
 
@@ -715,6 +819,15 @@ function formatDate(dateString) {
   return new Date(`${dateString}T12:00:00`).toLocaleDateString([], {
     day: "numeric",
     month: "short",
+  });
+}
+
+function formatLongDate(dateString) {
+  return new Date(`${dateString}T12:00:00`).toLocaleDateString([], {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 

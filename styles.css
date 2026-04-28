@@ -308,9 +308,65 @@ select:focus {
   justify-self: start;
 }
 
+.bank-holiday-toggle {
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+}
+
 .day-place-button {
   grid-column: 1 / -1;
   width: 100%;
+}
+
+.print-sheet {
+  display: none;
+}
+
+.print-heading {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.print-heading h2 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: 1.6rem;
+  color: #0f172a;
+}
+
+.print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  color: #475569;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.print-table th,
+.print-table td {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  text-align: left;
+  color: #0f172a;
+}
+
+.print-table th {
+  background: #e2e8f0;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.print-table tbody tr:nth-child(even) {
+  background: #f8fafc;
 }
 
 .calendar-day-date {
@@ -510,28 +566,11 @@ select:focus {
   }
 
   .hero,
-  .control-panel,
-  .button-row,
-  .helper-text {
+  .layout {
     display: none !important;
   }
 
-  .layout {
+  .print-sheet {
     display: block;
-    margin: 0;
-  }
-
-  .panel,
-  .week-section,
-  .summary-chip,
-  .calendar-day,
-  .session-block {
-    background: #ffffff;
-    box-shadow: none;
-    border-color: #d8d8d8;
-  }
-
-  .calendar-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

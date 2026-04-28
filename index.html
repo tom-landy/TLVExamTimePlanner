@@ -52,7 +52,8 @@
 
             <p class="break-note">
               Use the tick box on each day to show whether the candidate is in. Fixed breaks are always removed:
-              11:10 to 11:25, 13:35 to 14:15, and 15:20 to 15:25.
+              11:10 to 11:25, 13:35 to 14:15, and 15:20 to 15:25. A 10 minute buffer is also added at the start of
+              each day and after each break.
             </p>
 
             <div class="section-heading compact">
@@ -82,6 +83,8 @@
           <div class="weeks-stack" id="weeks-stack"></div>
         </section>
       </main>
+
+      <section class="print-sheet" id="print-sheet" aria-hidden="true"></section>
     </div>
 
     <template id="task-row-template">
@@ -118,6 +121,10 @@
           <label class="calendar-day-toggle">
             <input class="calendar-day-enabled" type="checkbox" />
             <span>In</span>
+          </label>
+          <label class="calendar-day-toggle bank-holiday-toggle is-hidden">
+            <input class="calendar-day-bank-holiday" type="checkbox" />
+            <span>Bank holiday</span>
           </label>
           <button class="day-place-button" type="button">Place task</button>
         </div>
