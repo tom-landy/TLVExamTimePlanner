@@ -463,15 +463,14 @@ select:focus {
 
 .session-block {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  padding: 10px 12px;
+  left: 18px;
+  right: 18px;
+  padding: 8px 10px;
   border-left: 5px solid var(--accent);
   background: rgba(255, 255, 255, 0.995);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.10);
   overflow: hidden;
   z-index: 3;
-  min-height: 74px;
 }
 
 .reading-session {
@@ -483,7 +482,7 @@ select:focus {
   font-size: 0.8rem;
   line-height: 1.15;
   color: var(--ink);
-  margin: 4px 0 3px;
+  margin: 3px 0 2px;
 }
 
 .session-time,
@@ -500,6 +499,40 @@ select:focus {
 
 .session-length {
   margin-top: 6px;
+}
+
+.session-compact {
+  padding: 7px 9px;
+}
+
+.session-compact h3 {
+  font-size: 0.72rem;
+  margin: 2px 0 1px;
+}
+
+.session-compact .session-time,
+.session-compact .session-length {
+  font-size: 0.62rem;
+}
+
+.session-compact .session-time {
+  margin-bottom: 4px;
+}
+
+.session-compact .session-length {
+  margin-top: 4px;
+}
+
+.session-tight {
+  padding: 6px 8px;
+}
+
+.session-tight h3 {
+  font-size: 0.68rem;
+}
+
+.session-tight .session-length {
+  display: none;
 }
 
 .is-hidden {

@@ -529,16 +529,23 @@ function renderDay(day, config) {
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
   placements.forEach((placement) => {
+    const durationMinutes = placement.endMinutes - placement.startMinutes;
     const session = document.createElement("article");
     const isReading = placement.kind === "reading";
     const task = isReading ? { name: placement.label } : config.tasks[placement.taskIndex];
     session.className = `session-block${isReading ? " reading-session" : ""}`;
+    if (durationMinutes <= 75) {
+      session.classList.add("session-compact");
+    }
+    if (durationMinutes <= 45) {
+      session.classList.add("session-tight");
+    }
     session.style.top = `${minuteToPercent(placement.startMinutes)}%`;
-    session.style.height = `${durationToPercent(placement.endMinutes - placement.startMinutes)}%`;
+    session.style.height = `${durationToPercent(durationMinutes)}%`;
     session.innerHTML = `
       <p class="session-time">${fromMinutes(placement.startMinutes)} to ${fromMinutes(placement.endMinutes)}</p>
       <h3>${escapeHtml(task.name)}</h3>
-      <p class="session-length">${formatMinutes(placement.endMinutes - placement.startMinutes)}</p>
+      <p class="session-length">${formatMinutes(durationMinutes)}</p>
     `;
     sessionLayer.append(session);
   });
