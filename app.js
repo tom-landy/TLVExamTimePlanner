@@ -51,6 +51,8 @@ function bindEvents() {
   els.autoPlaceButton.addEventListener("click", handleAutoPlaceAll);
   els.clearButton.addEventListener("click", handleClearCalendar);
   els.printButton.addEventListener("click", handlePrint);
+  els.form.addEventListener("input", handleLiveUpdate);
+  els.form.addEventListener("change", handleLiveUpdate);
   els.weekStart.addEventListener("change", () => {
     renderDayDates();
     refreshCalendar();
@@ -117,6 +119,18 @@ function renderTaskRows() {
 
 function handleRefresh(event) {
   event.preventDefault();
+  refreshCalendar();
+}
+
+function handleLiveUpdate(event) {
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (event.target.id === "week-start") {
+    return;
+  }
+
   refreshCalendar();
 }
 
@@ -192,7 +206,9 @@ function refreshCalendar() {
 
   state.placements = state.placements.filter((placement) => {
     const task = config.tasks[placement.taskIndex];
-    return task && task.name && task.minutes > 0;
+    const day = config.days[placement.dayIndex];
+
+    return task && task.name && task.minutes > 0 && isPlacementValid(day, placement);
   });
 
   renderCalendar(config, "Calendar refreshed.");
@@ -469,6 +485,16 @@ function getBreakSegments(day) {
     end: Math.min(day.endMinutes, breakSlot.end),
     label: breakSlot.label,
   })).filter((segment) => segment.end > segment.start);
+}
+
+function isPlacementValid(day, placement) {
+  if (!day || !day.enabled) {
+    return false;
+  }
+
+  return getWorkingSegments(day).some(
+    (segment) => placement.startMinutes >= segment.start && placement.endMinutes <= segment.end,
+  );
 }
 
 function subtractSegment(segment, blocked) {
