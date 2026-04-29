@@ -660,6 +660,7 @@ function renderScenarioGroup(weekDays, scenario) {
 function renderDay(day, config) {
   const node = els.dayColumnTemplate.content.firstElementChild.cloneNode(true);
   node.classList.toggle("day-offsite", !day.enabled);
+  node.classList.toggle("day-collapsed", config.compareMode && !day.enabled);
   node.querySelector(".calendar-day-name").textContent = day.name;
   node.querySelector(".calendar-day-date").textContent = formatDate(day.date);
 
