@@ -509,7 +509,7 @@ function renderPrintSheet(config) {
   overview.className = "print-overview";
   if (config.compareMode) {
     overview.innerHTML = `
-      <div class="print-note">Compare mode: Standard and Extra start each task together. A new task begins only after both groups finish the previous task.</div>
+      <div class="print-note">Show both calendars: Standard and Extra start each task together. A new task begins only after both groups finish the previous task.</div>
     `;
   }
   if (bankHolidays.length > 0) {
