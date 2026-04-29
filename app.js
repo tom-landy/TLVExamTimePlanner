@@ -957,8 +957,9 @@ function renderDay(day, config) {
     const durationMinutes = placement.endMinutes - placement.startMinutes;
     const session = document.createElement("article");
     const isReading = placement.kind === "reading";
-    const task = isReading ? { name: placement.label } : config.tasks[placement.taskIndex];
-    session.className = `session-block${isReading ? " reading-session" : ""}${placement.lateStay ? " late-stay-session" : ""}`;
+    const isPresentation = placement.kind === "presentation";
+    const task = isReading || isPresentation ? { name: placement.label } : config.tasks[placement.taskIndex];
+    session.className = `session-block${isReading ? " reading-session" : ""}${isPresentation ? " presentation-session" : ""}${placement.lateStay ? " late-stay-session" : ""}`;
     if (durationMinutes <= 75) {
       session.classList.add("session-compact");
     }
