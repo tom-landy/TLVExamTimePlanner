@@ -443,6 +443,18 @@ select:focus {
   font-size: 0.58rem;
 }
 
+.presentation-toggle {
+  padding: 5px 8px;
+  background: rgba(220, 252, 231, 0.95);
+  color: #166534;
+  font-size: 0.68rem;
+}
+
+.compare-shell .presentation-toggle {
+  padding: 3px 5px;
+  font-size: 0.58rem;
+}
+
 .print-sheet {
   display: none;
 }
@@ -536,6 +548,11 @@ select:focus {
   color: #1e3a8a;
   font-weight: 800;
   border-top-width: 2px;
+}
+
+.print-late-stay-row td {
+  background: #fff7ed;
+  color: #9a3412;
 }
 
 .calendar-day-date {
@@ -724,6 +741,30 @@ select:focus {
 .late-stay-session {
   border-left-color: #ea580c;
   box-shadow: 0 12px 24px rgba(234, 88, 12, 0.14);
+}
+
+.late-stay-dismiss {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(234, 88, 12, 0.12);
+  color: #c2410c;
+  font-size: 0.84rem;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.compare-shell .late-stay-dismiss {
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  font-size: 0.62rem;
 }
 
 .session-block h3 {

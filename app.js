@@ -33,6 +33,8 @@ const state = {
   },
   daySettings: [],
   bankHolidayIndexes: new Set(),
+  blockedLateStayKeys: new Set(),
+  presentationDayIndex: null,
 };
 
 const els = {
@@ -141,6 +143,7 @@ function handleExamTypeChange() {
   state.placements = [];
   state.comparePlacements.standard = [];
   state.comparePlacements.extra = [];
+  state.blockedLateStayKeys.clear();
   refreshCalendar();
 }
 
@@ -158,6 +161,7 @@ function handleCompareModeChange() {
   state.placements = [];
   state.comparePlacements.standard = [];
   state.comparePlacements.extra = [];
+  state.blockedLateStayKeys.clear();
   syncModeControls();
   refreshCalendar();
 }
@@ -226,6 +230,7 @@ function handleClearCalendar() {
   state.placements = [];
   state.comparePlacements.standard = [];
   state.comparePlacements.extra = [];
+  state.blockedLateStayKeys.clear();
   const config = readForm();
   if (!config.valid) {
     renderValidation(config.message);
@@ -324,6 +329,7 @@ function readForm() {
     days,
     baseTasks,
     tasks: baseTasks,
+    presentationDayIndex: state.presentationDayIndex,
   };
 }
 
@@ -429,11 +435,15 @@ function placeTask(config, taskIndex, startDayIndex, placements = state.placemen
 
 function getFreeSegments(day, dayIndex, config, placements = state.placements) {
   const workingSegments = getWorkingSegments(day, config);
-  const dayPlacements = placements
+  const dayPlacements = [...getFixedPlacements(config), ...placements]
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
   return subtractPlacementsFromSegments(workingSegments, dayPlacements);
+}
+
+function getFixedPlacements(config) {
+  return [...getReadingPlacements(config), ...getPresentationPlacements(config)];
 }
 
 function canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, placements) {
@@ -446,6 +456,10 @@ function canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, plac
   }
 
   if (day.endMinutes >= DAY_END) {
+    return false;
+  }
+
+  if (state.blockedLateStayKeys.has(getLateStayKey(config.timingType, taskIndex, dayIndex))) {
     return false;
   }
 
@@ -554,6 +568,7 @@ function renderPrintSheet(config) {
   const heading = document.createElement("div");
   heading.className = "print-heading";
   const bankHolidays = config.days.filter((day) => day.isBankHoliday).map((day) => `${day.name} ${formatLongDate(day.date)}`);
+  const presentationDay = state.presentationDayIndex === null ? null : config.days[state.presentationDayIndex];
   heading.innerHTML = `
     <h2>TLV Exam Calendar</h2>
     <div class="print-meta">
@@ -575,6 +590,12 @@ function renderPrintSheet(config) {
     holidayNote.className = "print-note";
     holidayNote.textContent = `Bank holidays: ${bankHolidays.join(", ")}`;
     overview.append(holidayNote);
+  }
+  if (presentationDay?.enabled) {
+    const presentationNote = document.createElement("div");
+    presentationNote.className = "print-note";
+    presentationNote.textContent = `Presentation day: ${presentationDay.name} ${formatLongDate(presentationDay.date)} (${formatMinutes(getPresentationMinutes(config.examType))})`;
+    overview.append(presentationNote);
   }
 
   const sections = scenarios.map((scenario) => renderPrintScenarioSection(scenario, config.compareMode));
@@ -632,7 +653,7 @@ function renderPrintScenarioSection(scenario, showGroupTitle) {
     let previousTaskLabel = "";
     placements.forEach((placement) => {
       const day = scenario.days[placement.dayIndex];
-      const taskLabel = placement.kind === "reading" ? placement.label : scenario.tasks[placement.taskIndex]?.name || "";
+      const taskLabel = getPlacementLabel(placement, scenario);
 
       if (taskLabel !== previousTaskLabel) {
         const groupRow = document.createElement("tr");
@@ -643,8 +664,11 @@ function renderPrintScenarioSection(scenario, showGroupTitle) {
       }
 
       const row = document.createElement("tr");
+      if (placement.lateStay) {
+        row.className = "print-late-stay-row";
+      }
       row.innerHTML = `
-        <td>${escapeHtml(taskLabel)}</td>
+        <td>${escapeHtml(placement.lateStay ? `${taskLabel} (Late stay)` : taskLabel)}</td>
         <td>Week ${day.weekIndex + 1}</td>
         <td>${escapeHtml(day.name)}</td>
         <td>${escapeHtml(formatLongDate(day.date))}</td>
@@ -780,6 +804,11 @@ function buildWordDocument(config) {
       font-weight: 800;
       border-top-width: 2px;
     }
+
+    .print-late-stay-row td {
+      background: #fff7ed;
+      color: #9a3412;
+    }
   `;
 
   return `<!doctype html>
@@ -863,18 +892,23 @@ function renderDay(day, config) {
   const enabledInput = node.querySelector(".calendar-day-enabled");
   const bankHolidayToggle = node.querySelector(".bank-holiday-toggle");
   const bankHolidayInput = node.querySelector(".calendar-day-bank-holiday");
+  const presentationToggle = node.querySelector(".presentation-toggle");
+  const presentationInput = node.querySelector(".calendar-day-presentation");
   const startInput = node.querySelector(".calendar-day-start");
   const endInput = node.querySelector(".calendar-day-end");
   const isMonday = day.name === "Monday";
   enabledInput.checked = day.enabled;
   bankHolidayInput.checked = day.isBankHoliday;
+  presentationInput.checked = state.presentationDayIndex === day.index;
   bankHolidayToggle.classList.toggle("is-hidden", !isMonday);
+  presentationInput.disabled = !day.enabled;
   startInput.value = day.start || "09:00";
   endInput.value = day.end || "16:30";
   startInput.disabled = !day.enabled;
   endInput.disabled = !day.enabled;
   enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(day.index, enabledInput.checked));
   bankHolidayInput.addEventListener("change", () => updateDayBankHoliday(day.index, bankHolidayInput.checked));
+  presentationInput.addEventListener("change", () => updatePresentationDay(day.index, presentationInput.checked));
   startInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "start", startInput.value));
   endInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "end", endInput.value));
 
@@ -934,6 +968,15 @@ function renderDay(day, config) {
       <h3>${escapeHtml(task.name)}</h3>
       <p class="session-length">${formatMinutes(durationMinutes)}</p>
     `;
+    if (placement.lateStay) {
+      const dismissButton = document.createElement("button");
+      dismissButton.type = "button";
+      dismissButton.className = "late-stay-dismiss";
+      dismissButton.setAttribute("aria-label", `Do not use late stay for ${task.name} on ${day.name}`);
+      dismissButton.textContent = "×";
+      dismissButton.addEventListener("click", () => blockLateStayAndReflow(config, placement.taskIndex, day.index));
+      session.append(dismissButton);
+    }
     sessionLayer.append(session);
   });
 
@@ -958,6 +1001,17 @@ function renderWarning(config) {
     });
   });
 
+  getRenderScenarios(config).forEach((scenario) => {
+    if (state.presentationDayIndex === null) {
+      return;
+    }
+
+    const placements = getPresentationPlacements(scenario);
+    if (placements.length === 0) {
+      warnings.push(`${capitalise(scenario.timingType)} presentation could not fit on the selected day`);
+    }
+  });
+
   if (warnings.length === 0) {
     els.warningBanner.classList.add("is-hidden");
     els.warningBanner.textContent = "";
@@ -980,14 +1034,22 @@ function getSortedPlacements(config) {
       return startDelta;
     }
 
-    const taskA = a.kind === "reading" ? a.label : config.tasks[a.taskIndex]?.name || "";
-    const taskB = b.kind === "reading" ? b.label : config.tasks[b.taskIndex]?.name || "";
+    const taskA = getPlacementLabel(a, config);
+    const taskB = getPlacementLabel(b, config);
     return taskA.localeCompare(taskB);
   });
 }
 
+function getPlacementLabel(placement, config) {
+  if (placement.kind === "reading" || placement.kind === "presentation") {
+    return placement.label;
+  }
+
+  return config.tasks[placement.taskIndex]?.name || "";
+}
+
 function getScheduledPlacements(config) {
-  return [...getReadingPlacements(config), ...getPlacementStore(config, config.timingType)];
+  return [...getReadingPlacements(config), ...getPresentationPlacements(config), ...getPlacementStore(config, config.timingType)];
 }
 
 function getReadingPlacements(config) {
@@ -1024,6 +1086,36 @@ function getReadingPlacements(config) {
   return placements;
 }
 
+function getPresentationPlacements(config) {
+  if (state.presentationDayIndex === null) {
+    return [];
+  }
+
+  const day = config.days[state.presentationDayIndex];
+  if (!day || !day.enabled) {
+    return [];
+  }
+
+  const presentationMinutes = getPresentationMinutes(config.examType);
+  const readingPlacements = getReadingPlacements(config).filter((placement) => placement.dayIndex === day.index);
+  const availableSegments = subtractPlacementsFromSegments(getWorkingSegments(day, config), readingPlacements);
+  const segment = availableSegments.find((candidate) => candidate.end - candidate.start >= presentationMinutes);
+
+  if (!segment) {
+    return [];
+  }
+
+  return [
+    {
+      kind: "presentation",
+      label: "Presentation",
+      dayIndex: day.index,
+      startMinutes: segment.start,
+      endMinutes: segment.start + presentationMinutes,
+    },
+  ];
+}
+
 function getRenderScenarios(config) {
   return config.compareMode ? [getScenarioConfig(config, "standard"), getScenarioConfig(config, "extra")] : [config];
 }
@@ -1038,6 +1130,10 @@ function getPlacementStore(config, timingType) {
 
 function getReadingMinutes(timingType) {
   return timingType === "extra" ? Math.round(READING_MINUTES * 1.25) : READING_MINUTES;
+}
+
+function getPresentationMinutes(examType) {
+  return examType === "ESP" ? 30 : 15;
 }
 
 function getIntroBlockedUntil(day, config) {
@@ -1115,10 +1211,10 @@ function getBreakSegments(day) {
   }
 
   return BREAKS.map((breakSlot) => ({
-    start: Math.max(day.startMinutes, breakSlot.start),
-    end: Math.min(day.endMinutes, breakSlot.end),
+    start: breakSlot.start,
+    end: breakSlot.end,
     label: breakSlot.label,
-  })).filter((segment) => segment.end > segment.start);
+  }));
 }
 
 function subtractSegment(segment, blocked) {
@@ -1197,9 +1293,75 @@ function updateDayBankHoliday(dayIndex, enabled) {
   refreshCalendar();
 }
 
+function updatePresentationDay(dayIndex, enabled) {
+  if (enabled) {
+    state.presentationDayIndex = dayIndex;
+  } else if (state.presentationDayIndex === dayIndex) {
+    state.presentationDayIndex = null;
+  }
+
+  reflowIfNeeded("Presentation day updated.");
+}
+
+function blockLateStayAndReflow(config, taskIndex, dayIndex) {
+  state.blockedLateStayKeys.add(getLateStayKey(config.timingType, taskIndex, dayIndex));
+  reflowIfNeeded("Late stay removed and calendars reflowed.");
+}
+
+function reflowIfNeeded(message) {
+  const config = readForm();
+  if (!config.valid) {
+    renderValidation(config.message);
+    return;
+  }
+
+  const hasPlacements =
+    state.placements.length > 0 ||
+    state.comparePlacements.standard.length > 0 ||
+    state.comparePlacements.extra.length > 0;
+
+  if (!hasPlacements) {
+    renderCalendars(config, message);
+    return;
+  }
+
+  if (config.compareMode) {
+    handleCompareAutoPlaceAll(config);
+    els.formFeedback.textContent = message;
+    return;
+  }
+
+  state.placements = [];
+  let nextStartDayIndex = 0;
+  let reflowMessage = message;
+
+  for (let taskIndex = 0; taskIndex < config.tasks.length; taskIndex += 1) {
+    const task = config.tasks[taskIndex];
+    if (!task.name || task.minutes <= 0) {
+      continue;
+    }
+
+    const result = placeTask(config, taskIndex, nextStartDayIndex, state.placements);
+    const placementDays = state.placements.filter((placement) => placement.taskIndex === taskIndex).map((placement) => placement.dayIndex);
+    if (placementDays.length > 0) {
+      nextStartDayIndex = Math.max(...placementDays) + 1;
+    }
+    if (result.remainingMinutes > 0) {
+      reflowMessage = `${task.name} could not fully fit into the four-week timetable.`;
+      break;
+    }
+  }
+
+  renderCalendars(config, reflowMessage);
+}
+
 function syncModeControls() {
   const compareMode = els.compareMode.checked;
   els.timingType.disabled = compareMode;
+}
+
+function getLateStayKey(timingType, taskIndex, dayIndex) {
+  return `${timingType}:${taskIndex}:${dayIndex}`;
 }
 
 function getSelectedTaskIndex() {
