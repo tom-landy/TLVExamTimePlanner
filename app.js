@@ -634,6 +634,7 @@ function renderWeeks(config) {
     weekNode.querySelector(".week-label").textContent = `Week ${weekIndex + 1}`;
     weekNode.querySelector(".week-range").textContent = `${formatDate(weekDays[0].date)} to ${formatDate(weekDays[weekDays.length - 1].date)}`;
     const shell = weekNode.querySelector(".calendar-shell");
+    shell.classList.toggle("compare-shell", config.compareMode);
     const groups = scenarios.map((scenario) => renderScenarioGroup(weekDays, scenario));
     shell.replaceChildren(...groups);
     weekNodes.push(weekNode);
@@ -645,6 +646,7 @@ function renderWeeks(config) {
 function renderScenarioGroup(weekDays, scenario) {
   const group = document.createElement("section");
   group.className = "scenario-group";
+  group.dataset.timing = scenario.timingType;
   const heading = document.createElement("div");
   heading.className = "scenario-heading";
   heading.textContent = capitalise(scenario.timingType);
