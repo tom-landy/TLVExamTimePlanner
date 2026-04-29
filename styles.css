@@ -385,6 +385,7 @@ select:focus {
   min-width: 0;
   padding: 8px;
   border-radius: 18px;
+  overflow: hidden;
 }
 
 .compare-shell .calendar-day.day-offsite {
@@ -410,6 +411,7 @@ select:focus {
 .calendar-day-meta {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .calendar-day-submeta {
@@ -417,11 +419,16 @@ select:focus {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .compare-shell .calendar-day-name {
   font-size: 0.62rem;
   letter-spacing: 0.08em;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .compare-shell .calendar-day.day-collapsed .calendar-day-name {
@@ -433,6 +440,8 @@ select:focus {
 .compare-shell .calendar-day-date {
   margin-top: 2px;
   font-size: 0.72rem;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .calendar-day-toggle {
@@ -452,6 +461,29 @@ select:focus {
   gap: 5px;
   padding: 5px 7px;
   font-size: 0.68rem;
+}
+
+.compare-shell .calendar-day-header {
+  position: relative;
+  display: block;
+  min-height: 54px;
+  margin-bottom: 8px;
+}
+
+.compare-shell .calendar-day-meta {
+  padding-right: 56px;
+}
+
+.compare-shell .calendar-day-submeta {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.compare-shell .calendar-day-toggle:not(.bank-holiday-toggle) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  justify-self: unset;
 }
 
 .compare-shell .calendar-day.day-collapsed .calendar-day-header {
@@ -618,6 +650,7 @@ select:focus {
 .compare-shell .calendar-time-edit {
   gap: 6px;
   margin-bottom: 8px;
+  margin-top: 4px;
 }
 
 .calendar-time-edit label {
