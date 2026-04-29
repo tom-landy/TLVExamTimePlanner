@@ -42,10 +42,9 @@ const els = {
   weekStart: document.querySelector("#week-start"),
   examType: document.querySelector("#exam-type"),
   taskList: document.querySelector("#task-list"),
-  placeTaskButton: document.querySelector("#place-task-button"),
   autoPlaceButton: document.querySelector("#auto-place-button"),
   clearButton: document.querySelector("#clear-button"),
-  printButton: document.querySelector("#print-button"),
+  downloadButton: document.querySelector("#download-button"),
   formFeedback: document.querySelector("#form-feedback"),
   summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
@@ -78,10 +77,9 @@ function initialiseDaySettings() {
 function bindEvents() {
   els.form.addEventListener("submit", handleRefresh);
   els.form.addEventListener("change", handleLiveUpdate);
-  els.placeTaskButton.addEventListener("click", handlePlaceSelectedTask);
   els.autoPlaceButton.addEventListener("click", handleAutoPlaceAll);
   els.clearButton.addEventListener("click", handleClearCalendar);
-  els.printButton.addEventListener("click", handlePrint);
+  els.downloadButton.addEventListener("click", handleDownloadSchedule);
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
   els.compareMode.addEventListener("change", handleCompareModeChange);
@@ -237,16 +235,16 @@ function handleClearCalendar() {
   renderCalendars(config, "Calendars cleared.");
 }
 
-function handlePrint() {
+function handleDownloadSchedule() {
   const config = readForm();
   if (!config.valid) {
     renderValidation(config.message);
     return;
   }
 
-  renderCalendars(config, "Ready to print.");
+  renderCalendars(config, "Schedule downloaded.");
   renderPrintSheet(config);
-  window.print();
+  downloadWordSchedule(config);
 }
 
 function refreshCalendar() {
@@ -660,6 +658,144 @@ function renderPrintScenarioSection(scenario, showGroupTitle) {
   table.append(tbody);
   section.append(table);
   return section;
+}
+
+function downloadWordSchedule(config) {
+  const documentHtml = buildWordDocument(config);
+  const blob = new Blob([`\ufeff${documentHtml}`], {
+    type: "application/msword",
+  });
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const weekLabel = config.weekStart.replaceAll("-", "");
+  link.href = downloadUrl;
+  link.download = `TLV-Exam-Schedule-${config.examType}-${weekLabel}.doc`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+}
+
+function buildWordDocument(config) {
+  const title = "TLV Exam Calendar";
+  const stylesheet = `
+    body {
+      font-family: Arial, sans-serif;
+      color: #0f172a;
+      margin: 18px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+    }
+
+    .print-sheet {
+      display: block;
+    }
+
+    .print-heading {
+      display: block;
+      margin-bottom: 18px;
+    }
+
+    .print-heading h2 {
+      margin-bottom: 10px;
+      font-size: 22px;
+    }
+
+    .print-meta,
+    .print-scenario-meta {
+      display: block;
+      margin-bottom: 8px;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .print-meta span,
+    .print-scenario-meta span {
+      display: inline-block;
+      margin-right: 16px;
+      margin-bottom: 6px;
+    }
+
+    .print-overview {
+      margin-bottom: 18px;
+    }
+
+    .print-note {
+      margin-bottom: 8px;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .print-scenario {
+      margin-bottom: 22px;
+    }
+
+    .print-scenario-title {
+      margin-bottom: 10px;
+      font-size: 18px;
+      color: #1d4ed8;
+    }
+
+    .print-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+
+    .print-table th,
+    .print-table td {
+      padding: 7px 8px;
+      border: 1px solid #cbd5e1;
+      text-align: left;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+
+    .print-table th {
+      background: #e2e8f0;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .print-table tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .print-task-group td {
+      background: #eaf2ff;
+      color: #1e3a8a;
+      font-weight: 800;
+      border-top-width: 2px;
+    }
+  `;
+
+  return `<!doctype html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="ProgId" content="Word.Document" />
+    <meta name="Generator" content="TLV Exam Calendar" />
+    <title>${escapeHtml(title)}</title>
+    <style>${stylesheet}</style>
+  </head>
+  <body>
+    <div class="print-sheet">
+      ${els.printSheet.innerHTML}
+    </div>
+  </body>
+</html>`;
 }
 
 function renderSummary(config) {
