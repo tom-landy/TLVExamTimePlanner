@@ -397,6 +397,28 @@ function placeTask(config, taskIndex, startDayIndex, placements = state.placemen
       });
       remainingMinutes -= usedMinutes;
     }
+
+    if (canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, placements)) {
+      const lateSegments = getLateStaySegments(day, dayIndex, config, placements);
+      const lateCapacity = lateSegments.reduce((total, segment) => total + (segment.end - segment.start), 0);
+
+      if (lateCapacity >= remainingMinutes) {
+        for (const segment of lateSegments) {
+          if (remainingMinutes <= 0) {
+            break;
+          }
+
+          const usedMinutes = Math.min(segment.end - segment.start, remainingMinutes);
+          placements.push({
+            taskIndex,
+            dayIndex,
+            startMinutes: segment.start,
+            endMinutes: segment.start + usedMinutes,
+          });
+          remainingMinutes -= usedMinutes;
+        }
+      }
+    }
   }
 
   if (remainingMinutes > 0) {
@@ -408,6 +430,43 @@ function placeTask(config, taskIndex, startDayIndex, placements = state.placemen
 
 function getFreeSegments(day, dayIndex, config, placements = state.placements) {
   const workingSegments = getWorkingSegments(day, config);
+  const dayPlacements = placements
+    .filter((placement) => placement.dayIndex === dayIndex)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
+
+  return subtractPlacementsFromSegments(workingSegments, dayPlacements);
+}
+
+function canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, placements) {
+  if (config.timingType !== "extra") {
+    return false;
+  }
+
+  if (remainingMinutes <= 0 || remainingMinutes > 60) {
+    return false;
+  }
+
+  if (day.endMinutes >= DAY_END) {
+    return false;
+  }
+
+  return placements.some((placement) => placement.taskIndex === taskIndex && placement.dayIndex === dayIndex);
+}
+
+function getLateStaySegments(day, dayIndex, config, placements) {
+  const extendedDay = {
+    ...day,
+    end: fromMinutes(DAY_END),
+    endMinutes: DAY_END,
+  };
+
+  const workingSegments = getWorkingSegments(extendedDay, config)
+    .map((segment) => ({
+      start: Math.max(segment.start, day.endMinutes),
+      end: segment.end,
+    }))
+    .filter((segment) => segment.end > segment.start);
+
   const dayPlacements = placements
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
