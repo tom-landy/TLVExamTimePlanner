@@ -495,25 +495,69 @@ function renderPrintSheet(config) {
   const scenarios = getRenderScenarios(config);
   const heading = document.createElement("div");
   heading.className = "print-heading";
+  const bankHolidays = config.days.filter((day) => day.isBankHoliday).map((day) => `${day.name} ${formatLongDate(day.date)}`);
   heading.innerHTML = `
     <h2>TLV Exam Calendar</h2>
     <div class="print-meta">
       <span>Exam: ${escapeHtml(config.examType)}</span>
       <span>View: ${escapeHtml(config.compareMode ? "Compare" : capitalise(config.timingType))}</span>
       <span>Start week: ${escapeHtml(formatLongDate(config.weekStart))}</span>
+      <span>Weeks: ${WEEKS}</span>
     </div>
   `;
+  const overview = document.createElement("div");
+  overview.className = "print-overview";
+  if (config.compareMode) {
+    overview.innerHTML = `
+      <div class="print-note">Compare mode: Standard and Extra start each task together. A new task begins only after both groups finish the previous task.</div>
+    `;
+  }
+  if (bankHolidays.length > 0) {
+    const holidayNote = document.createElement("div");
+    holidayNote.className = "print-note";
+    holidayNote.textContent = `Bank holidays: ${bankHolidays.join(", ")}`;
+    overview.append(holidayNote);
+  }
+
+  const sections = scenarios.map((scenario) => renderPrintScenarioSection(scenario, config.compareMode));
+  printSheet.replaceChildren(heading, overview, ...sections);
+}
+
+function renderPrintScenarioSection(scenario, showGroupTitle) {
+  const section = document.createElement("section");
+  section.className = "print-scenario";
+
+  const placements = getSortedPlacements(scenario);
+  const totals = document.createElement("div");
+  totals.className = "print-scenario-meta";
+  const totalTaskMinutes = scenario.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
+  const totalPlacedMinutes = getPlacementStore(scenario, scenario.timingType).reduce(
+    (total, placement) => total + (placement.endMinutes - placement.startMinutes),
+    0,
+  );
+
+  if (showGroupTitle) {
+    const title = document.createElement("h3");
+    title.className = "print-scenario-title";
+    title.textContent = capitalise(scenario.timingType);
+    section.append(title);
+  }
+
+  totals.innerHTML = `
+    <span>Tasks: ${escapeHtml(formatMinutes(totalTaskMinutes))}</span>
+    <span>Placed: ${escapeHtml(formatMinutes(totalPlacedMinutes))}</span>
+  `;
+  section.append(totals);
 
   const table = document.createElement("table");
   table.className = "print-table";
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Group</th>
+        <th>Task</th>
         <th>Week</th>
         <th>Day</th>
         <th>Date</th>
-        <th>Task</th>
         <th>Start</th>
         <th>End</th>
         <th>Duration</th>
@@ -522,26 +566,30 @@ function renderPrintSheet(config) {
   `;
 
   const tbody = document.createElement("tbody");
-
-  const rows = scenarios.flatMap((scenario) =>
-    getSortedPlacements(scenario).map((placement) => ({ placement, scenario })),
-  );
-
-  if (rows.length === 0) {
+  if (placements.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="8">No task sessions have been placed yet.</td>';
+    row.innerHTML = '<td colspan="7">No task sessions have been placed yet.</td>';
     tbody.append(row);
   } else {
-    rows.forEach(({ placement, scenario }) => {
+    let previousTaskLabel = "";
+    placements.forEach((placement) => {
       const day = scenario.days[placement.dayIndex];
-      const taskLabel = placement.kind === "reading" ? placement.label : scenario.tasks[placement.taskIndex]?.name;
+      const taskLabel = placement.kind === "reading" ? placement.label : scenario.tasks[placement.taskIndex]?.name || "";
+
+      if (taskLabel !== previousTaskLabel) {
+        const groupRow = document.createElement("tr");
+        groupRow.className = "print-task-group";
+        groupRow.innerHTML = `<td colspan="7">${escapeHtml(taskLabel)}</td>`;
+        tbody.append(groupRow);
+        previousTaskLabel = taskLabel;
+      }
+
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${escapeHtml(capitalise(scenario.timingType))}</td>
+        <td>${escapeHtml(taskLabel)}</td>
         <td>Week ${day.weekIndex + 1}</td>
         <td>${escapeHtml(day.name)}</td>
         <td>${escapeHtml(formatLongDate(day.date))}</td>
-        <td>${escapeHtml(taskLabel || "")}</td>
         <td>${escapeHtml(fromMinutes(placement.startMinutes))}</td>
         <td>${escapeHtml(fromMinutes(placement.endMinutes))}</td>
         <td>${escapeHtml(formatMinutes(placement.endMinutes - placement.startMinutes))}</td>
@@ -551,7 +599,8 @@ function renderPrintSheet(config) {
   }
 
   table.append(tbody);
-  printSheet.replaceChildren(heading, table);
+  section.append(table);
+  return section;
 }
 
 function renderSummary(config) {

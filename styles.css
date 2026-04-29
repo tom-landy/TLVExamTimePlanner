@@ -347,7 +347,7 @@ select:focus {
 
 .print-heading {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
@@ -367,10 +367,47 @@ select:focus {
   font-weight: 700;
 }
 
+.print-overview {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.print-note {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.print-scenario {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+  break-inside: avoid;
+}
+
+.print-scenario-title {
+  font-size: 1.1rem;
+  color: #1d4ed8;
+}
+
+.print-scenario-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  color: #475569;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .print-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
 }
 
 .print-table th,
@@ -390,6 +427,13 @@ select:focus {
 
 .print-table tbody tr:nth-child(even) {
   background: #f8fafc;
+}
+
+.print-task-group td {
+  background: #eaf2ff;
+  color: #1e3a8a;
+  font-weight: 800;
+  border-top-width: 2px;
 }
 
 .calendar-day-date {
@@ -644,6 +688,11 @@ select:focus {
 }
 
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
   body {
     background: #ffffff;
   }
