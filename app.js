@@ -412,6 +412,7 @@ function placeTask(config, taskIndex, startDayIndex, placements = state.placemen
             dayIndex,
             startMinutes: segment.start,
             endMinutes: segment.start + usedMinutes,
+            lateStay: true,
           });
           remainingMinutes -= usedMinutes;
         }
@@ -919,7 +920,7 @@ function renderDay(day, config) {
     const session = document.createElement("article");
     const isReading = placement.kind === "reading";
     const task = isReading ? { name: placement.label } : config.tasks[placement.taskIndex];
-    session.className = `session-block${isReading ? " reading-session" : ""}`;
+    session.className = `session-block${isReading ? " reading-session" : ""}${placement.lateStay ? " late-stay-session" : ""}`;
     if (durationMinutes <= 75) {
       session.classList.add("session-compact");
     }
