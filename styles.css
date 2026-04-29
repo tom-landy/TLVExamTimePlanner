@@ -204,6 +204,41 @@ select:focus {
   padding: 10px 12px;
 }
 
+.presentation-field {
+  display: grid;
+  gap: 10px;
+}
+
+.presentation-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.presentation-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.presentation-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(22, 101, 52, 0.16);
+  border-radius: 14px;
+  background: rgba(240, 253, 244, 0.86);
+  color: #166534;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.presentation-chip input {
+  width: auto;
+  margin: 0;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -741,6 +776,10 @@ select:focus {
 .presentation-session {
   border-left-color: #166534;
   box-shadow: 0 12px 24px rgba(22, 101, 52, 0.12);
+}
+
+.presentation-day-session {
+  background: rgba(240, 253, 244, 0.96);
 }
 
 .late-stay-session {

@@ -34,7 +34,7 @@ const state = {
   daySettings: [],
   bankHolidayIndexes: new Set(),
   blockedLateStayKeys: new Set(),
-  presentationDayIndex: null,
+  presentationDayIndexes: new Set(),
 };
 
 const els = {
@@ -47,6 +47,7 @@ const els = {
   autoPlaceButton: document.querySelector("#auto-place-button"),
   clearButton: document.querySelector("#clear-button"),
   downloadButton: document.querySelector("#download-button"),
+  presentationDays: document.querySelector("#presentation-days"),
   formFeedback: document.querySelector("#form-feedback"),
   summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
@@ -63,6 +64,7 @@ function initialise() {
   els.weekStart.value = getCurrentMonday();
   initialiseDaySettings();
   renderTaskRows();
+  renderPresentationDayControls();
   syncModeControls();
   bindEvents();
   refreshCalendar();
@@ -85,7 +87,10 @@ function bindEvents() {
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
   els.compareMode.addEventListener("change", handleCompareModeChange);
-  els.weekStart.addEventListener("change", refreshCalendar);
+  els.weekStart.addEventListener("change", () => {
+    renderPresentationDayControls();
+    refreshCalendar();
+  });
 }
 
 function renderTaskRows() {
@@ -298,7 +303,7 @@ function readForm() {
     const weekdayIndex = index % DAYS.length;
     const weekday = weekdaySettings[weekdayIndex];
     const isBankHoliday = state.bankHolidayIndexes.has(index);
-    const isPresentationDay = state.presentationDayIndex === index;
+    const isPresentationDay = state.presentationDayIndexes.has(index);
     const baseEnabled = weekday.enabled && !isBankHoliday;
 
     return {
@@ -333,7 +338,6 @@ function readForm() {
     days,
     baseTasks,
     tasks: baseTasks,
-    presentationDayIndex: state.presentationDayIndex,
   };
 }
 
@@ -572,7 +576,7 @@ function renderPrintSheet(config) {
   const heading = document.createElement("div");
   heading.className = "print-heading";
   const bankHolidays = config.days.filter((day) => day.isBankHoliday).map((day) => `${day.name} ${formatLongDate(day.date)}`);
-  const presentationDay = state.presentationDayIndex === null ? null : config.days[state.presentationDayIndex];
+  const presentationDays = config.days.filter((day) => day.isPresentationDay);
   heading.innerHTML = `
     <h2>TLV Exam Calendar</h2>
     <div class="print-meta">
@@ -595,10 +599,12 @@ function renderPrintSheet(config) {
     holidayNote.textContent = `Bank holidays: ${bankHolidays.join(", ")}`;
     overview.append(holidayNote);
   }
-  if (presentationDay) {
+  if (presentationDays.length > 0) {
     const presentationNote = document.createElement("div");
     presentationNote.className = "print-note";
-    presentationNote.textContent = `Presentation day: ${presentationDay.name} ${formatLongDate(presentationDay.date)} (${formatMinutes(getPresentationMinutes(config.examType))})`;
+    presentationNote.textContent = `Presentation days: ${presentationDays
+      .map((day) => `${day.name} ${formatLongDate(day.date)}`)
+      .join(", ")} (${formatMinutes(getPresentationMinutes(config.examType))} each)`;
     overview.append(presentationNote);
   }
 
@@ -896,23 +902,18 @@ function renderDay(day, config) {
   const enabledInput = node.querySelector(".calendar-day-enabled");
   const bankHolidayToggle = node.querySelector(".bank-holiday-toggle");
   const bankHolidayInput = node.querySelector(".calendar-day-bank-holiday");
-  const presentationToggle = node.querySelector(".presentation-toggle");
-  const presentationInput = node.querySelector(".calendar-day-presentation");
   const startInput = node.querySelector(".calendar-day-start");
   const endInput = node.querySelector(".calendar-day-end");
   const isMonday = day.name === "Monday";
   enabledInput.checked = day.enabled;
   bankHolidayInput.checked = day.isBankHoliday;
-  presentationInput.checked = day.isPresentationDay;
   bankHolidayToggle.classList.toggle("is-hidden", !isMonday);
-  presentationInput.disabled = !day.baseEnabled && !day.isPresentationDay;
   startInput.value = day.start || "09:00";
   endInput.value = day.end || "16:30";
   startInput.disabled = !day.enabled;
   endInput.disabled = !day.enabled;
   enabledInput.addEventListener("change", () => updateDayEnabledFromCalendar(day.index, enabledInput.checked));
   bankHolidayInput.addEventListener("change", () => updateDayBankHoliday(day.index, bankHolidayInput.checked));
-  presentationInput.addEventListener("change", () => updatePresentationDay(day.index, presentationInput.checked));
   startInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "start", startInput.value));
   endInput.addEventListener("change", () => updateDayTimeFromCalendar(day.index, "end", endInput.value));
 
@@ -942,6 +943,19 @@ function renderDay(day, config) {
       breakBlock.textContent = segment.label;
       availabilityLayer.append(breakBlock);
     });
+
+    if (day.isPresentationDay) {
+      const presentationBlock = document.createElement("article");
+      presentationBlock.className = "session-block presentation-session presentation-day-session";
+      presentationBlock.style.top = `${minuteToPercent(day.startMinutes)}%`;
+      presentationBlock.style.height = `${durationToPercent(day.endMinutes - day.startMinutes)}%`;
+      presentationBlock.innerHTML = `
+        <p class="session-time">${fromMinutes(day.startMinutes)} to ${fromMinutes(day.endMinutes)}</p>
+        <h3>Presentation</h3>
+        <p class="session-length">${formatMinutes(day.endMinutes - day.startMinutes)}</p>
+      `;
+      sessionLayer.append(presentationBlock);
+    }
   } else {
     const offsite = document.createElement("div");
     offsite.className = "offsite-note";
@@ -1007,13 +1021,17 @@ function renderWarning(config) {
   });
 
   getRenderScenarios(config).forEach((scenario) => {
-    if (state.presentationDayIndex === null) {
+    if (state.presentationDayIndexes.size === 0) {
       return;
     }
 
-    const placements = getPresentationPlacements(scenario);
-    if (placements.length === 0) {
-      warnings.push(`${capitalise(scenario.timingType)} presentation could not fit on the selected day`);
+    const missingDays = scenario.days.filter((day) => day.isPresentationDay && !day.enabled);
+    if (missingDays.length > 0) {
+      warnings.push(
+        `${capitalise(scenario.timingType)} presentation day unavailable: ${missingDays
+          .map((day) => `${day.name} ${formatDate(day.date)}`)
+          .join(", ")}`,
+      );
     }
   });
 
@@ -1092,33 +1110,15 @@ function getReadingPlacements(config) {
 }
 
 function getPresentationPlacements(config) {
-  if (state.presentationDayIndex === null) {
-    return [];
-  }
-
-  const day = config.days[state.presentationDayIndex];
-  if (!day || !day.enabled) {
-    return [];
-  }
-
-  const presentationMinutes = getPresentationMinutes(config.examType);
-  const readingPlacements = getReadingPlacements(config).filter((placement) => placement.dayIndex === day.index);
-  const availableSegments = subtractPlacementsFromSegments(getWorkingSegments(day, config), readingPlacements);
-  const segment = availableSegments.find((candidate) => candidate.end - candidate.start >= presentationMinutes);
-
-  if (!segment) {
-    return [];
-  }
-
-  return [
-    {
+  return config.days
+    .filter((day) => day.isPresentationDay && day.enabled)
+    .map((day) => ({
       kind: "presentation",
       label: "Presentation",
       dayIndex: day.index,
-      startMinutes: segment.start,
-      endMinutes: segment.start + presentationMinutes,
-    },
-  ];
+      startMinutes: day.startMinutes,
+      endMinutes: day.endMinutes,
+    }));
 }
 
 function getRenderScenarios(config) {
@@ -1291,24 +1291,25 @@ function updateDayEnabledFromCalendar(dayIndex, enabled) {
 function updateDayBankHoliday(dayIndex, enabled) {
   if (enabled) {
     state.bankHolidayIndexes.add(dayIndex);
-    if (state.presentationDayIndex === dayIndex) {
-      state.presentationDayIndex = null;
-    }
+    state.presentationDayIndexes.delete(dayIndex);
   } else {
     state.bankHolidayIndexes.delete(dayIndex);
   }
 
+  renderPresentationDayControls();
   reflowIfNeeded("Day updated.");
 }
 
 function updatePresentationDay(dayIndex, enabled) {
   if (enabled) {
-    state.presentationDayIndex = dayIndex;
-  } else if (state.presentationDayIndex === dayIndex) {
-    state.presentationDayIndex = null;
+    state.presentationDayIndexes.add(dayIndex);
+    state.bankHolidayIndexes.delete(dayIndex);
+  } else {
+    state.presentationDayIndexes.delete(dayIndex);
   }
 
-  reflowIfNeeded("Presentation day updated.");
+  renderPresentationDayControls();
+  reflowIfNeeded("Presentation days updated.");
 }
 
 function blockLateStayAndReflow(config, taskIndex, dayIndex) {
@@ -1370,6 +1371,29 @@ function syncModeControls() {
 
 function getLateStayKey(timingType, taskIndex, dayIndex) {
   return `${timingType}:${taskIndex}:${dayIndex}`;
+}
+
+function renderPresentationDayControls() {
+  const baseMonday = els.weekStart.value || getCurrentMonday();
+  const nodes = Array.from({ length: TOTAL_DAYS }, (_, index) => {
+    const label = document.createElement("label");
+    label.className = "presentation-chip";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = state.presentationDayIndexes.has(index);
+    input.addEventListener("change", () => updatePresentationDay(index, input.checked));
+
+    const weekday = DAYS[index % DAYS.length];
+    const date = formatDate(addPlannerDays(baseMonday, index));
+    const text = document.createElement("span");
+    text.textContent = `W${Math.floor(index / DAYS.length) + 1} ${weekday.slice(0, 3)} ${date}`;
+
+    label.append(input, text);
+    return label;
+  });
+
+  els.presentationDays.replaceChildren(...nodes);
 }
 
 function getSelectedTaskIndex() {
