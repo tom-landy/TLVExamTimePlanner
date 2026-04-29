@@ -27,6 +27,10 @@ const EXAM_EXTRA_EXEMPT_MINUTES = {
 
 const state = {
   placements: [],
+  comparePlacements: {
+    standard: [],
+    extra: [],
+  },
   daySettings: [],
   bankHolidayIndexes: new Set(),
 };
@@ -34,6 +38,7 @@ const state = {
 const els = {
   form: document.querySelector("#planner-form"),
   timingType: document.querySelector("#timing-type"),
+  compareMode: document.querySelector("#compare-mode"),
   weekStart: document.querySelector("#week-start"),
   examType: document.querySelector("#exam-type"),
   taskList: document.querySelector("#task-list"),
@@ -57,6 +62,7 @@ function initialise() {
   els.weekStart.value = getCurrentMonday();
   initialiseDaySettings();
   renderTaskRows();
+  syncModeControls();
   bindEvents();
   refreshCalendar();
 }
@@ -78,6 +84,7 @@ function bindEvents() {
   els.printButton.addEventListener("click", handlePrint);
   els.examType.addEventListener("change", handleExamTypeChange);
   els.timingType.addEventListener("change", handleExamTypeChange);
+  els.compareMode.addEventListener("change", handleCompareModeChange);
   els.weekStart.addEventListener("change", refreshCalendar);
 }
 
@@ -125,7 +132,8 @@ function handleLiveUpdate(event) {
 
 function handleExamTypeChange() {
   const taskNames = getExamTaskNames(els.examType.value);
-  const durations = getExamDefaultHours(els.examType.value, els.timingType.value);
+  const timingType = els.compareMode.checked ? "standard" : els.timingType.value;
+  const durations = getExamDefaultHours(els.examType.value, timingType);
 
   Array.from(els.taskList.children).forEach((node, index) => {
     node.querySelector(".task-name").value = taskNames[index];
@@ -133,6 +141,26 @@ function handleExamTypeChange() {
   });
 
   state.placements = [];
+  state.comparePlacements.standard = [];
+  state.comparePlacements.extra = [];
+  refreshCalendar();
+}
+
+function handleCompareModeChange() {
+  if (els.compareMode.checked && els.timingType.value === "extra") {
+    els.timingType.value = "standard";
+    const taskNames = getExamTaskNames(els.examType.value);
+    const durations = getExamDefaultHours(els.examType.value, "standard");
+    Array.from(els.taskList.children).forEach((node, index) => {
+      node.querySelector(".task-name").value = taskNames[index];
+      node.querySelector(".task-hours").value = String(durations[index]);
+    });
+  }
+
+  state.placements = [];
+  state.comparePlacements.standard = [];
+  state.comparePlacements.extra = [];
+  syncModeControls();
   refreshCalendar();
 }
 
@@ -140,6 +168,11 @@ function handlePlaceSelectedTask() {
   const config = readForm();
   if (!config.valid) {
     renderValidation(config.message);
+    return;
+  }
+
+  if (config.compareMode) {
+    renderValidation("Use Auto place all when compare mode is on.");
     return;
   }
 
@@ -160,6 +193,11 @@ function handleAutoPlaceAll() {
     return;
   }
 
+  if (config.compareMode) {
+    handleCompareAutoPlaceAll(config);
+    return;
+  }
+
   state.placements = [];
   let nextStartDayIndex = 0;
   let message = "All tasks placed across the four-week timetable.";
@@ -170,7 +208,7 @@ function handleAutoPlaceAll() {
       continue;
     }
 
-    const result = placeTask(config, taskIndex, nextStartDayIndex);
+    const result = placeTask(config, taskIndex, nextStartDayIndex, state.placements);
     const placementDays = state.placements.filter((placement) => placement.taskIndex === taskIndex).map((placement) => placement.dayIndex);
 
     if (placementDays.length > 0) {
@@ -188,6 +226,8 @@ function handleAutoPlaceAll() {
 
 function handleClearCalendar() {
   state.placements = [];
+  state.comparePlacements.standard = [];
+  state.comparePlacements.extra = [];
   const config = readForm();
   if (!config.valid) {
     renderValidation(config.message);
@@ -216,11 +256,16 @@ function refreshCalendar() {
     return;
   }
 
-  state.placements = state.placements.filter((placement) => {
-    const task = config.tasks[placement.taskIndex];
-    const day = config.days[placement.dayIndex];
-    return task && task.name && task.minutes > 0 && isPlacementValid(day, placement);
-  });
+  if (config.compareMode) {
+    const standardScenario = getScenarioConfig(config, "standard");
+    const extraScenario = getScenarioConfig(config, "extra");
+    state.comparePlacements.standard = filterValidPlacements(state.comparePlacements.standard, standardScenario);
+    state.comparePlacements.extra = filterValidPlacements(state.comparePlacements.extra, extraScenario);
+    renderCalendars(config, "Calendars refreshed.");
+    return;
+  }
+
+  state.placements = filterValidPlacements(state.placements, config);
 
   renderCalendars(config, "Calendars refreshed.");
 }
@@ -266,7 +311,7 @@ function readForm() {
     };
   });
 
-  const tasks = Array.from(els.taskList.children).map((node, index) => ({
+  const baseTasks = Array.from(els.taskList.children).map((node, index) => ({
     index,
     name: node.querySelector(".task-name").value.trim(),
     minutes: Math.round((Number(node.querySelector(".task-hours").value) || 0) * 60),
@@ -274,22 +319,58 @@ function readForm() {
 
   return {
     valid: true,
+    compareMode: els.compareMode.checked,
     timingType: els.timingType.value,
     examType: els.examType.value,
     weekStart: els.weekStart.value,
     days,
-    tasks,
+    baseTasks,
+    tasks: baseTasks,
   };
 }
 
-function placeTask(config, taskIndex, startDayIndex) {
+function handleCompareAutoPlaceAll(config) {
+  const standardScenario = getScenarioConfig(config, "standard");
+  const extraScenario = getScenarioConfig(config, "extra");
+  state.comparePlacements.standard = [];
+  state.comparePlacements.extra = [];
+  let nextStartDayIndex = 0;
+  let message = "Standard and extra calendars placed across the four-week timetable.";
+
+  for (let taskIndex = 0; taskIndex < config.baseTasks.length; taskIndex += 1) {
+    const baseTask = config.baseTasks[taskIndex];
+    if (!baseTask.name || baseTask.minutes <= 0) {
+      continue;
+    }
+
+    const standardResult = placeTask(standardScenario, taskIndex, nextStartDayIndex, state.comparePlacements.standard);
+    const extraResult = placeTask(extraScenario, taskIndex, nextStartDayIndex, state.comparePlacements.extra);
+    const lastDayIndex = Math.max(
+      getTaskLastDayIndex(state.comparePlacements.standard, taskIndex),
+      getTaskLastDayIndex(state.comparePlacements.extra, taskIndex),
+    );
+
+    if (lastDayIndex >= 0) {
+      nextStartDayIndex = lastDayIndex + 1;
+    }
+
+    if (standardResult.remainingMinutes > 0 || extraResult.remainingMinutes > 0) {
+      message = `${baseTask.name} could not fully fit for both timing groups.`;
+      break;
+    }
+  }
+
+  renderCalendars(config, message);
+}
+
+function placeTask(config, taskIndex, startDayIndex, placements = state.placements) {
   const task = config.tasks[taskIndex];
 
   if (!task || !task.name || task.minutes <= 0) {
     return { remainingMinutes: 0, message: "Enter a task name and a length before placing it." };
   }
 
-  state.placements = state.placements.filter((placement) => placement.taskIndex !== taskIndex);
+  removeTaskPlacements(placements, taskIndex);
 
   let remainingMinutes = task.minutes;
   const dayOrder = buildDayOrder(startDayIndex, config.days.length);
@@ -300,7 +381,7 @@ function placeTask(config, taskIndex, startDayIndex) {
       continue;
     }
 
-    const freeSegments = getFreeSegments(day, dayIndex, config);
+    const freeSegments = getFreeSegments(day, dayIndex, config, placements);
 
     for (const segment of freeSegments) {
       if (remainingMinutes <= 0) {
@@ -308,7 +389,7 @@ function placeTask(config, taskIndex, startDayIndex) {
       }
 
       const usedMinutes = Math.min(segment.end - segment.start, remainingMinutes);
-      state.placements.push({
+      placements.push({
         taskIndex,
         dayIndex,
         startMinutes: segment.start,
@@ -325,13 +406,53 @@ function placeTask(config, taskIndex, startDayIndex) {
   return { remainingMinutes: 0, message: `${task.name} placed into the calendars.` };
 }
 
-function getFreeSegments(day, dayIndex, config) {
+function getFreeSegments(day, dayIndex, config, placements = state.placements) {
   const workingSegments = getWorkingSegments(day, config);
-  const placements = state.placements
+  const dayPlacements = placements
     .filter((placement) => placement.dayIndex === dayIndex)
     .sort((a, b) => a.startMinutes - b.startMinutes);
 
-  return subtractPlacementsFromSegments(workingSegments, placements);
+  return subtractPlacementsFromSegments(workingSegments, dayPlacements);
+}
+
+function removeTaskPlacements(placements, taskIndex) {
+  const nextPlacements = placements.filter((placement) => placement.taskIndex !== taskIndex);
+  placements.length = 0;
+  placements.push(...nextPlacements);
+}
+
+function getTaskLastDayIndex(placements, taskIndex) {
+  const placementDays = placements.filter((placement) => placement.taskIndex === taskIndex).map((placement) => placement.dayIndex);
+  return placementDays.length > 0 ? Math.max(...placementDays) : -1;
+}
+
+function filterValidPlacements(placements, config) {
+  return placements.filter((placement) => {
+    const task = config.tasks[placement.taskIndex];
+    const day = config.days[placement.dayIndex];
+    return task && task.name && task.minutes > 0 && isPlacementValid(day, placement, config);
+  });
+}
+
+function getScenarioConfig(config, timingType) {
+  return {
+    ...config,
+    timingType,
+    tasks: getScenarioTasks(config.baseTasks, config.examType, timingType),
+  };
+}
+
+function getScenarioTasks(baseTasks, examType, timingType) {
+  return baseTasks.map((task, index) => ({
+    ...task,
+    minutes: timingType === "extra" ? getAdjustedMinutes(task.minutes, examType, index) : task.minutes,
+  }));
+}
+
+function getAdjustedMinutes(baseMinutes, examType, taskIndex) {
+  const exemptMinutes = (EXAM_EXTRA_EXEMPT_MINUTES[examType] || EXAM_EXTRA_EXEMPT_MINUTES.ESP)[taskIndex] || 0;
+  const extendableMinutes = Math.max(0, baseMinutes - exemptMinutes);
+  return Math.round(extendableMinutes * 1.25 + exemptMinutes);
 }
 
 function subtractPlacementsFromSegments(workingSegments, placements) {
@@ -371,14 +492,14 @@ function renderCalendars(config, message) {
 
 function renderPrintSheet(config) {
   const printSheet = els.printSheet;
-  const placements = getSortedPlacements(config);
+  const scenarios = getRenderScenarios(config);
   const heading = document.createElement("div");
   heading.className = "print-heading";
   heading.innerHTML = `
     <h2>TLV Exam Calendar</h2>
     <div class="print-meta">
       <span>Exam: ${escapeHtml(config.examType)}</span>
-      <span>Timing: ${escapeHtml(capitalise(config.timingType))}</span>
+      <span>View: ${escapeHtml(config.compareMode ? "Compare" : capitalise(config.timingType))}</span>
       <span>Start week: ${escapeHtml(formatLongDate(config.weekStart))}</span>
     </div>
   `;
@@ -388,6 +509,7 @@ function renderPrintSheet(config) {
   table.innerHTML = `
     <thead>
       <tr>
+        <th>Group</th>
         <th>Week</th>
         <th>Day</th>
         <th>Date</th>
@@ -401,16 +523,21 @@ function renderPrintSheet(config) {
 
   const tbody = document.createElement("tbody");
 
-  if (placements.length === 0) {
+  const rows = scenarios.flatMap((scenario) =>
+    getSortedPlacements(scenario).map((placement) => ({ placement, scenario })),
+  );
+
+  if (rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="7">No task sessions have been placed yet.</td>';
+    row.innerHTML = '<td colspan="8">No task sessions have been placed yet.</td>';
     tbody.append(row);
   } else {
-    placements.forEach((placement) => {
-      const day = config.days[placement.dayIndex];
-      const taskLabel = placement.kind === "reading" ? placement.label : config.tasks[placement.taskIndex]?.name;
+    rows.forEach(({ placement, scenario }) => {
+      const day = scenario.days[placement.dayIndex];
+      const taskLabel = placement.kind === "reading" ? placement.label : scenario.tasks[placement.taskIndex]?.name;
       const row = document.createElement("tr");
       row.innerHTML = `
+        <td>${escapeHtml(capitalise(scenario.timingType))}</td>
         <td>Week ${day.weekIndex + 1}</td>
         <td>${escapeHtml(day.name)}</td>
         <td>${escapeHtml(formatLongDate(day.date))}</td>
@@ -432,36 +559,51 @@ function renderSummary(config) {
     (total, day) => total + getWorkingSegments(day, config).reduce((sum, segment) => sum + (segment.end - segment.start), 0),
     0,
   );
-  const totalTaskMinutes = config.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
-  const placedMinutes = state.placements.reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
+  const scenarios = getRenderScenarios(config);
+  const chips = [`Exam: ${config.examType}`, `Weeks: ${WEEKS}`, `Available per calendar: ${formatMinutes(totalCapacity)}`];
 
-  const chips = [
-    `Timing: ${capitalise(config.timingType)}`,
-    `Exam: ${config.examType}`,
-    `Weeks: ${WEEKS}`,
-    `Available: ${formatMinutes(totalCapacity)}`,
-    `Tasks entered: ${formatMinutes(totalTaskMinutes)}`,
-    `Placed: ${formatMinutes(placedMinutes)}`,
-  ].map(renderSummaryChip);
+  scenarios.forEach((scenario) => {
+    const totalTaskMinutes = scenario.tasks.reduce((total, task) => total + (task.name ? task.minutes : 0), 0);
+    const placedMinutes = getPlacementStore(config, scenario.timingType).reduce(
+      (total, placement) => total + (placement.endMinutes - placement.startMinutes),
+      0,
+    );
+    chips.push(`${capitalise(scenario.timingType)} tasks: ${formatMinutes(totalTaskMinutes)}`);
+    chips.push(`${capitalise(scenario.timingType)} placed: ${formatMinutes(placedMinutes)}`);
+  });
 
-  els.summaryStrip.replaceChildren(...chips);
+  els.summaryStrip.replaceChildren(...chips.map(renderSummaryChip));
 }
 
 function renderWeeks(config) {
   const weekNodes = [];
+  const scenarios = getRenderScenarios(config);
 
   for (let weekIndex = 0; weekIndex < WEEKS; weekIndex += 1) {
     const weekNode = els.weekTemplate.content.firstElementChild.cloneNode(true);
     const weekDays = config.days.slice(weekIndex * DAYS.length, (weekIndex + 1) * DAYS.length);
     weekNode.querySelector(".week-label").textContent = `Week ${weekIndex + 1}`;
     weekNode.querySelector(".week-range").textContent = `${formatDate(weekDays[0].date)} to ${formatDate(weekDays[weekDays.length - 1].date)}`;
-
-    const dayNodes = weekDays.map((day) => renderDay(day, config));
-    weekNode.querySelector(".calendar-grid").replaceChildren(...dayNodes);
+    const shell = weekNode.querySelector(".calendar-shell");
+    const groups = scenarios.map((scenario) => renderScenarioGroup(weekDays, scenario));
+    shell.replaceChildren(...groups);
     weekNodes.push(weekNode);
   }
 
   els.weeksStack.replaceChildren(...weekNodes);
+}
+
+function renderScenarioGroup(weekDays, scenario) {
+  const group = document.createElement("section");
+  group.className = "scenario-group";
+  const heading = document.createElement("div");
+  heading.className = "scenario-heading";
+  heading.textContent = capitalise(scenario.timingType);
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+  grid.replaceChildren(...weekDays.map((day) => renderDay(day, scenario)));
+  group.append(heading, grid);
+  return group;
 }
 
 function renderDay(day, config) {
@@ -551,19 +693,20 @@ function renderDay(day, config) {
 
 function renderWarning(config) {
   const warnings = [];
+  getRenderScenarios(config).forEach((scenario) => {
+    scenario.tasks.forEach((task) => {
+      if (!task.name || task.minutes <= 0) {
+        return;
+      }
 
-  config.tasks.forEach((task) => {
-    if (!task.name || task.minutes <= 0) {
-      return;
-    }
+      const placedMinutes = getPlacementStore(config, scenario.timingType)
+        .filter((placement) => placement.taskIndex === task.index)
+        .reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
 
-    const placedMinutes = state.placements
-      .filter((placement) => placement.taskIndex === task.index)
-      .reduce((total, placement) => total + (placement.endMinutes - placement.startMinutes), 0);
-
-    if (placedMinutes < task.minutes) {
-      warnings.push(`${task.name} has ${formatMinutes(task.minutes - placedMinutes)} still unplaced`);
-    }
+      if (placedMinutes < task.minutes) {
+        warnings.push(`${capitalise(scenario.timingType)} ${task.name} has ${formatMinutes(task.minutes - placedMinutes)} still unplaced`);
+      }
+    });
   });
 
   if (warnings.length === 0) {
@@ -595,7 +738,7 @@ function getSortedPlacements(config) {
 }
 
 function getScheduledPlacements(config) {
-  return [...getReadingPlacements(config), ...state.placements];
+  return [...getReadingPlacements(config), ...getPlacementStore(config, config.timingType)];
 }
 
 function getReadingPlacements(config) {
@@ -630,6 +773,18 @@ function getReadingPlacements(config) {
   }
 
   return placements;
+}
+
+function getRenderScenarios(config) {
+  return config.compareMode ? [getScenarioConfig(config, "standard"), getScenarioConfig(config, "extra")] : [config];
+}
+
+function getPlacementStore(config, timingType) {
+  if (config.compareMode) {
+    return state.comparePlacements[timingType] || [];
+  }
+
+  return state.placements;
 }
 
 function getReadingMinutes(timingType) {
@@ -735,12 +890,11 @@ function subtractSegment(segment, blocked) {
   return nextSegments;
 }
 
-function isPlacementValid(day, placement) {
+function isPlacementValid(day, placement, config = readForm()) {
   if (!day || !day.enabled) {
     return false;
   }
 
-  const config = readForm();
   if (!config.valid) {
     return false;
   }
@@ -792,6 +946,12 @@ function updateDayBankHoliday(dayIndex, enabled) {
   }
 
   refreshCalendar();
+}
+
+function syncModeControls() {
+  const compareMode = els.compareMode.checked;
+  els.timingType.disabled = compareMode;
+  els.placeTaskButton.disabled = compareMode;
 }
 
 function getSelectedTaskIndex() {
