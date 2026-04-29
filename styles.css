@@ -402,7 +402,7 @@ select:focus {
 
 .calendar-day-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-bottom: 10px;
   align-items: start;
@@ -410,7 +410,14 @@ select:focus {
 
 .calendar-day-meta {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.calendar-day-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -431,6 +438,10 @@ select:focus {
   text-overflow: ellipsis;
 }
 
+.compare-shell .calendar-day-title {
+  gap: 8px;
+}
+
 .compare-shell .calendar-day.day-collapsed .calendar-day-name {
   font-size: 0.64rem;
   text-align: center;
@@ -438,7 +449,6 @@ select:focus {
 }
 
 .compare-shell .calendar-day-date {
-  margin-top: 2px;
   font-size: 0.72rem;
   line-height: 1.1;
   white-space: nowrap;
@@ -463,27 +473,9 @@ select:focus {
   font-size: 0.68rem;
 }
 
-.compare-shell .calendar-day-header {
-  position: relative;
-  display: block;
-  min-height: 54px;
-  margin-bottom: 8px;
-}
-
-.compare-shell .calendar-day-meta {
-  padding-right: 56px;
-}
-
 .compare-shell .calendar-day-submeta {
   gap: 6px;
   flex-wrap: nowrap;
-}
-
-.compare-shell .calendar-day-toggle:not(.bank-holiday-toggle) {
-  position: absolute;
-  top: 0;
-  right: 0;
-  justify-self: unset;
 }
 
 .compare-shell .calendar-day.day-collapsed .calendar-day-header {
@@ -493,11 +485,14 @@ select:focus {
   margin-bottom: 0;
 }
 
-.compare-shell .calendar-day.day-collapsed .calendar-day-submeta,
 .compare-shell .calendar-day.day-collapsed .bank-holiday-toggle,
 .compare-shell .calendar-day.day-collapsed .calendar-time-edit,
 .compare-shell .calendar-day.day-collapsed .calendar-track {
   display: none;
+}
+
+.compare-shell .calendar-day.day-collapsed .calendar-day-submeta {
+  justify-content: center;
 }
 
 .compare-shell .calendar-day.day-collapsed .calendar-day-toggle {
