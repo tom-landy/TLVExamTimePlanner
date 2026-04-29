@@ -306,7 +306,7 @@ function readForm() {
       weekdayIndex,
       name: weekday.name,
       date: addPlannerDays(els.weekStart.value, index),
-      enabled: baseEnabled && !isPresentationDay,
+      enabled: baseEnabled,
       baseEnabled,
       start: weekday.start,
       end: weekday.end,
@@ -447,7 +447,7 @@ function getFreeSegments(day, dayIndex, config, placements = state.placements) {
 }
 
 function getFixedPlacements(config) {
-  return [...getReadingPlacements(config)];
+  return [...getReadingPlacements(config), ...getPresentationPlacements(config)];
 }
 
 function canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, placements) {
@@ -598,7 +598,7 @@ function renderPrintSheet(config) {
   if (presentationDay) {
     const presentationNote = document.createElement("div");
     presentationNote.className = "print-note";
-    presentationNote.textContent = `Presentation day: ${presentationDay.name} ${formatLongDate(presentationDay.date)}`;
+    presentationNote.textContent = `Presentation day: ${presentationDay.name} ${formatLongDate(presentationDay.date)} (${formatMinutes(getPresentationMinutes(config.examType))})`;
     overview.append(presentationNote);
   }
 
@@ -945,7 +945,7 @@ function renderDay(day, config) {
   } else {
     const offsite = document.createElement("div");
     offsite.className = "offsite-note";
-    offsite.textContent = day.isBankHoliday ? "Bank holiday" : day.isPresentationDay ? "Presentation" : "Not in";
+    offsite.textContent = day.isBankHoliday ? "Bank holiday" : "Not in";
     availabilityLayer.append(offsite);
   }
 
@@ -1005,6 +1005,17 @@ function renderWarning(config) {
     });
   });
 
+  getRenderScenarios(config).forEach((scenario) => {
+    if (state.presentationDayIndex === null) {
+      return;
+    }
+
+    const placements = getPresentationPlacements(scenario);
+    if (placements.length === 0) {
+      warnings.push(`${capitalise(scenario.timingType)} presentation could not fit on the selected day`);
+    }
+  });
+
   if (warnings.length === 0) {
     els.warningBanner.classList.add("is-hidden");
     els.warningBanner.textContent = "";
@@ -1034,7 +1045,7 @@ function getSortedPlacements(config) {
 }
 
 function getPlacementLabel(placement, config) {
-  if (placement.kind === "reading") {
+  if (placement.kind === "reading" || placement.kind === "presentation") {
     return placement.label;
   }
 
@@ -1042,7 +1053,7 @@ function getPlacementLabel(placement, config) {
 }
 
 function getScheduledPlacements(config) {
-  return [...getReadingPlacements(config), ...getPlacementStore(config, config.timingType)];
+  return [...getReadingPlacements(config), ...getPresentationPlacements(config), ...getPlacementStore(config, config.timingType)];
 }
 
 function getReadingPlacements(config) {
@@ -1079,6 +1090,36 @@ function getReadingPlacements(config) {
   return placements;
 }
 
+function getPresentationPlacements(config) {
+  if (state.presentationDayIndex === null) {
+    return [];
+  }
+
+  const day = config.days[state.presentationDayIndex];
+  if (!day || !day.enabled) {
+    return [];
+  }
+
+  const presentationMinutes = getPresentationMinutes(config.examType);
+  const readingPlacements = getReadingPlacements(config).filter((placement) => placement.dayIndex === day.index);
+  const availableSegments = subtractPlacementsFromSegments(getWorkingSegments(day, config), readingPlacements);
+  const segment = availableSegments.find((candidate) => candidate.end - candidate.start >= presentationMinutes);
+
+  if (!segment) {
+    return [];
+  }
+
+  return [
+    {
+      kind: "presentation",
+      label: "Presentation",
+      dayIndex: day.index,
+      startMinutes: segment.start,
+      endMinutes: segment.start + presentationMinutes,
+    },
+  ];
+}
+
 function getRenderScenarios(config) {
   return config.compareMode ? [getScenarioConfig(config, "standard"), getScenarioConfig(config, "extra")] : [config];
 }
@@ -1093,6 +1134,10 @@ function getPlacementStore(config, timingType) {
 
 function getReadingMinutes(timingType) {
   return timingType === "extra" ? Math.round(READING_MINUTES * 1.25) : READING_MINUTES;
+}
+
+function getPresentationMinutes(examType) {
+  return examType === "ESP" ? 30 : 15;
 }
 
 function getIntroBlockedUntil(day, config) {
