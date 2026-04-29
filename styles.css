@@ -209,16 +209,29 @@ select:focus {
   gap: 10px;
 }
 
-.presentation-title {
-  margin: 0;
+.presentation-dropdown {
+  border: 1px solid rgba(100, 116, 139, 0.20);
+  border-radius: 16px;
+  padding: 10px 12px 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.presentation-summary {
+  cursor: pointer;
   font-size: 0.95rem;
   font-weight: 700;
+  list-style: none;
+}
+
+.presentation-summary::-webkit-details-marker {
+  display: none;
 }
 
 .presentation-days {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px;
+  margin-top: 10px;
 }
 
 .presentation-chip {

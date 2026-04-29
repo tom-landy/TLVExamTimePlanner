@@ -48,6 +48,7 @@ const els = {
   clearButton: document.querySelector("#clear-button"),
   downloadButton: document.querySelector("#download-button"),
   presentationDays: document.querySelector("#presentation-days"),
+  presentationSummary: document.querySelector("#presentation-summary"),
   formFeedback: document.querySelector("#form-feedback"),
   summaryStrip: document.querySelector("#summary-strip"),
   warningBanner: document.querySelector("#warning-banner"),
@@ -452,6 +453,17 @@ function getFreeSegments(day, dayIndex, config, placements = state.placements) {
 
 function getFixedPlacements(config) {
   return [...getReadingPlacements(config), ...getPresentationPlacements(config)];
+}
+
+function getPresentationUnlockTaskIndex(examType) {
+  return examType === "ESP" ? 3 : 2;
+}
+
+function getPresentationUnlockDayIndex(config) {
+  const unlockTaskIndex = getPresentationUnlockTaskIndex(config.examType);
+  const placements = getPlacementStore(config, config.timingType);
+  const lastDayIndex = getTaskLastDayIndex(placements, unlockTaskIndex);
+  return lastDayIndex >= 0 ? lastDayIndex + 1 : null;
 }
 
 function canUseLateStay(config, day, dayIndex, taskIndex, remainingMinutes, placements) {
@@ -943,19 +955,6 @@ function renderDay(day, config) {
       breakBlock.textContent = segment.label;
       availabilityLayer.append(breakBlock);
     });
-
-    if (day.isPresentationDay) {
-      const presentationBlock = document.createElement("article");
-      presentationBlock.className = "session-block presentation-session presentation-day-session";
-      presentationBlock.style.top = `${minuteToPercent(day.startMinutes)}%`;
-      presentationBlock.style.height = `${durationToPercent(day.endMinutes - day.startMinutes)}%`;
-      presentationBlock.innerHTML = `
-        <p class="session-time">${fromMinutes(day.startMinutes)} to ${fromMinutes(day.endMinutes)}</p>
-        <h3>Presentation</h3>
-        <p class="session-length">${formatMinutes(day.endMinutes - day.startMinutes)}</p>
-      `;
-      sessionLayer.append(presentationBlock);
-    }
   } else {
     const offsite = document.createElement("div");
     offsite.className = "offsite-note";
@@ -1032,6 +1031,19 @@ function renderWarning(config) {
           .map((day) => `${day.name} ${formatDate(day.date)}`)
           .join(", ")}`,
       );
+    }
+
+    const unlockDayIndex = getPresentationUnlockDayIndex(scenario);
+    if (unlockDayIndex !== null) {
+      const tooEarlyDays = scenario.days.filter((day) => day.isPresentationDay && day.index < unlockDayIndex);
+      if (tooEarlyDays.length > 0) {
+        const unlockTaskName = scenario.tasks[getPresentationUnlockTaskIndex(scenario.examType)]?.name || "required task";
+        warnings.push(
+          `${capitalise(scenario.timingType)} presentation days before ${unlockTaskName} are ignored: ${tooEarlyDays
+            .map((day) => `${day.name} ${formatDate(day.date)}`)
+            .join(", ")}`,
+        );
+      }
     }
   });
 
@@ -1110,8 +1122,13 @@ function getReadingPlacements(config) {
 }
 
 function getPresentationPlacements(config) {
+  const unlockDayIndex = getPresentationUnlockDayIndex(config);
+  if (unlockDayIndex === null) {
+    return [];
+  }
+
   return config.days
-    .filter((day) => day.isPresentationDay && day.enabled)
+    .filter((day) => day.isPresentationDay && day.enabled && day.index >= unlockDayIndex)
     .map((day) => ({
       kind: "presentation",
       label: "Presentation",
@@ -1375,6 +1392,8 @@ function getLateStayKey(timingType, taskIndex, dayIndex) {
 
 function renderPresentationDayControls() {
   const baseMonday = els.weekStart.value || getCurrentMonday();
+  const selectedCount = state.presentationDayIndexes.size;
+  els.presentationSummary.textContent = selectedCount > 0 ? `Presentation days (${selectedCount} selected)` : "Presentation days";
   const nodes = Array.from({ length: TOTAL_DAYS }, (_, index) => {
     const label = document.createElement("label");
     label.className = "presentation-chip";
