@@ -1199,7 +1199,6 @@ function updateDayBankHoliday(dayIndex, enabled) {
 function syncModeControls() {
   const compareMode = els.compareMode.checked;
   els.timingType.disabled = compareMode;
-  els.placeTaskButton.disabled = compareMode;
 }
 
 function getSelectedTaskIndex() {
